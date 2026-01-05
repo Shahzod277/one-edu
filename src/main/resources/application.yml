@@ -1,0 +1,51 @@
+server:
+  port: 8083
+  ssl:
+    enabled: true
+    key-alias: selfsigned
+    key-store: classpath:keystore.jks
+    key-store-type: PKCS12
+    key-password: changeit
+    key-store-password: changeit
+
+spring:
+  application:
+    name: prof_edu_platform
+  datasource:
+    url: jdbc:postgresql://172.18.10.42:5432/one_edu
+    username: postgres
+    password: 2030306
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      connection-timeout: 20000
+  jpa:
+    open-in-view: false
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+  servlet:
+    multipart:
+      max-file-size: 20MB      # bitta fayl uchun maksimal hajm
+      max-request-size: 20MB   # butun request hajmi (fayl + form-data)
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 1
+
+springdoc:
+  swagger-ui:
+    path: /docs/swagger-ui.html
+  api-docs:
+    path: /docs
+
+file:
+  storage:
+    location: /home/software/kasbiy_edu/file_storage/
+  iib_storage:
+    iib_location: /home/software/kasbiy_edu/fileStorageIIB/
+
+jwt:
+  secret: '[0-9.a-zA-z_]^+$ProfEduPlatformSecretKey1230321Akj9dfd6kf12fdASQrFbsMrXh56@409nPgGfd528482'
