@@ -7,6 +7,7 @@ import uz.raqamli_talim.oneedu.model.ClientSystemDto;
 import uz.raqamli_talim.oneedu.model.ResponseDto;
 import uz.raqamli_talim.oneedu.sevice.ClientSystemService;
 
+
 @RestController
 @RequestMapping("/api/client-systems")
 @RequiredArgsConstructor
