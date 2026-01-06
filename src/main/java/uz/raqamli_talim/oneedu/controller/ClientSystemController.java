@@ -39,7 +39,7 @@ public class ClientSystemController {
     // READ ALL (PAGE) -> Page qaytaryapti
     // page ni siz service’da 1 dan boshlab qabul qilyapsiz (page>0 bo‘lsa -1)
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+//    @PreAuthorize("isAuthenticated()")
     public Page<ClientSystemDto> getAllAsPage(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size
