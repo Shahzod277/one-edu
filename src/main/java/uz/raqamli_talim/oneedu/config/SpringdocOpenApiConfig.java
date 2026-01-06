@@ -21,6 +21,6 @@ public class SpringdocOpenApiConfig {
                                 .type(SecurityScheme.Type.HTTP)
                                 .scheme("bearer")
                                 .bearerFormat("JWT")))
-                .info(new Info().title("Kasbiy ta'lim platformasi").version("1.0.0"));
+                .info(new Info().title("Id edu ").version("1.0.0"));
     }
 }

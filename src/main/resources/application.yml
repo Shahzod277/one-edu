@@ -29,11 +29,7 @@ spring:
       max-file-size: 20MB      # bitta fayl uchun maksimal hajm
       max-request-size: 20MB   # butun request hajmi (fayl + form-data)
 
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      database: 1
+
 
 springdoc:
   swagger-ui:
@@ -41,11 +37,11 @@ springdoc:
   api-docs:
     path: /docs
 
-file:
-  storage:
-    location: /home/software/kasbiy_edu/file_storage/
-  iib_storage:
-    iib_location: /home/software/kasbiy_edu/fileStorageIIB/
+#file:
+#  storage:
+#    location: /home/software/kasbiy_edu/file_storage/
+#  iib_storage:
+#    iib_location: /home/software/kasbiy_edu/fileStorageIIB/
 
 jwt:
   secret: '[0-9.a-zA-z_]^+$ProfEduPlatformSecretKey1230321Akj9dfd6kf12fdASQrFbsMrXh56@409nPgGfd528482'
