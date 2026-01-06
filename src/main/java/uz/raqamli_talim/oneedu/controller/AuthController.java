@@ -5,7 +5,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdResponseUserInfo;
+import uz.raqamli_talim.oneedu.model.LoginRequest;
+import uz.raqamli_talim.oneedu.model.ResponseDto;
 import uz.raqamli_talim.oneedu.sevice.AuthService;
+import uz.raqamli_talim.oneedu.sevice.ClientSystemService;
 
 import java.net.URI;
 
@@ -14,6 +17,7 @@ import java.net.URI;
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
+    private final ClientSystemService clientSystemService;
 
     @GetMapping("oneIdAdmin/{apiKey}")
     public ResponseEntity<?> getOneIdAdmin(@PathVariable String apiKey) {
@@ -35,5 +39,11 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(redirectUri)
                 .build();
+    }
+    @PostMapping("public/signIn")
+    public ResponseEntity<?> signIn(@RequestBody LoginRequest request) {
+        ResponseDto response = clientSystemService.signIn(request);
+        return new ResponseEntity<>(response, HttpStatus.valueOf(response.getCode()));
+
     }
 }
