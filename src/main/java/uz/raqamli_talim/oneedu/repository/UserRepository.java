@@ -20,8 +20,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     @Query("select u from User u where u.pinfl = ?1 ")
     Optional<User> findByPinfl(String pinfl);
 
-    @Query("select (count(u) > 0) from User u where u.phoneNumber = ?1")
-    Boolean existsByPhoneNumber(String phoneNumber);
+
 //
 //    @Query(value = " select u.id, u.first_name firstName, u.last_name lastName, u.father_name fatherName, " +
 //            "       u.pinfl, u.phone_number phoneNumber, u.serial_and_number serialAndNumber, " +
