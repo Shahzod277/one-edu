@@ -27,5 +27,11 @@ public class ClientSystem {
     private String postCallbackUrl;
 
     @Column(name = "active", nullable = false)
-    private Boolean active = true;
+    private Boolean active;
+
+    private String orgInn;
+    private String org;
+    private String systemName;
+    private String domen;
+
 }
