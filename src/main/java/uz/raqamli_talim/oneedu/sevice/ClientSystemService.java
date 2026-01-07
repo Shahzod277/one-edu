@@ -140,6 +140,10 @@ public class ClientSystemService {
         dto.setRedirectUrl(cs.getRedirectUrl());
         dto.setPostCallbackUrl(cs.getPostCallbackUrl());
         dto.setActive(cs.getActive());
+        dto.setOrg(cs.getOrg());
+        dto.setOrgInn(cs.getOrgInn());
+        dto.setDomen(cs.getDomen());
+        dto.setSystemName(cs.getSystemName());
         return dto;
     }
 

@@ -29,9 +29,16 @@ public class ClientSystem {
     @Column(name = "active", nullable = false)
     private Boolean active;
 
-    private String orgInn;
+    @Column(name = "org")
     private String org;
+
+    @Column(name = "org_inn")
+    private String orgInn;
+
+    @Column(name = "system_name")
     private String systemName;
+
+    @Column(name = "domen")
     private String domen;
 
 }
