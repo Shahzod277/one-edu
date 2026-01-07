@@ -28,7 +28,7 @@ public class AuthController {
     }
 
 
-    @GetMapping("auth")
+    @GetMapping("/callback")
     public ResponseEntity<?> oneIdAdminSignIn(
             @RequestParam("code") String code,
             @RequestParam("state") String state   // ⬅️ BU apiKey

@@ -12,12 +12,12 @@ import java.net.URI;
 @RequiredArgsConstructor
 public class OneIdServiceApiAdmin {
 
-    private final String client_id = "kasbiy_edu_uz";
-    private final String scope = "kasbiy.edu.uz";
-    private final String redirect_uri = "https://kasbiy.edu.uz/api/public/auth/code";
-    private final String client_secret = "Xq92HdZ06YXKp5s53XI9HjGy";
-    public static final String ONE_ID_LOGIN = "kasbiy_edu_uz";
-    public static final String ONE_ID_PASSWORD = "Xq92HdZ06YXKp5s53XI9HjGy";
+    private final String client_id = "my_edu_uz";
+    private final String scope = "id.edu.uz";
+    private final String redirect_uri = "https://id.edu.uz/api/auth/callback";
+    private final String client_secret = "F9o57w9kS7wWlBqqPmSXHztf";
+    public static final String ONE_ID_LOGIN = "my_edu_uz";
+    public static final String ONE_ID_PASSWORD = "F9o57w9kS7wWlBqqPmSXHztf";
     private final WebClient webClient;
 
     public URI redirectOneIdUrl(String apiKey) {
