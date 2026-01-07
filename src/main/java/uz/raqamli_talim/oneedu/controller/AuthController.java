@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
 import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdResponseUserInfo;
 import uz.raqamli_talim.oneedu.model.LoginRequest;
 import uz.raqamli_talim.oneedu.model.ResponseDto;
@@ -29,17 +30,18 @@ public class AuthController {
 
 
     @GetMapping("/callback")
-    public ResponseEntity<?> oneIdAdminSignIn(
+    public Mono<ResponseEntity<Void>> oneIdAdminSignIn(
             @RequestParam("code") String code,
-            @RequestParam("state") String state   // ⬅️ BU apiKey
+            @RequestParam("state") String state   // ⬅️ apiKey
     ) {
-        // service hamma ishni qiladi
-        URI redirectUri = authService.oneIdAdminSignInAndRedirect(code, state);
-
-        return ResponseEntity.status(HttpStatus.FOUND)
-                .location(redirectUri)
-                .build();
+        return authService.oneIdAdminSignInAndRedirect(code, state)
+                .map(redirectUri ->
+                        ResponseEntity.status(HttpStatus.FOUND)
+                                .location(redirectUri)
+                                .build()
+                );
     }
+
     @PostMapping("public/signIn")
     public ResponseEntity<?> signIn(@RequestBody LoginRequest request) {
         ResponseDto response = clientSystemService.signIn(request);
