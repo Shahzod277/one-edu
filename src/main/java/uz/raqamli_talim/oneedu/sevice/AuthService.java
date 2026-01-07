@@ -42,7 +42,6 @@ public class AuthService {
         if (!Boolean.TRUE.equals(clientSystem.getActive())) {
             throw new NotFoundException("Sizga ruxsat yo‘q");
         }
-
         OneIdTokenResponse oneIdToken =
                 oneIdServiceApiAdmin.getAccessAndRefreshToken(code);
 
@@ -50,13 +49,13 @@ public class AuthService {
                 oneIdServiceApiAdmin.getUserInfo(oneIdToken.getAccess_token());
 
         if (userInfo == null || userInfo.getPin() == null) {
-            return URI.create("https://kasbiy.edu.uz/notFound");
+            return URI.create(clientSystem.getApiKey());
         }
 
         // 🔥 POST callback
         webClient.post()
                 .uri(clientSystem.getPostCallbackUrl())
-                .header("X-API-KEY", clientSystem.getApiKey())
+//                .header("X-API-KEY", clientSystem.getApiKey())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(userInfo)
                 .retrieve()
