@@ -19,7 +19,7 @@ public class AuthController {
     private final AuthService authService;
     private final ClientSystemService clientSystemService;
 
-    @GetMapping("oneIdAdmin/{apiKey}")
+    @GetMapping("/{apiKey}")
     public ResponseEntity<?> getOneIdAdmin(@PathVariable String apiKey) {
         URI uri = authService.redirectOneIdUrlAdmin(apiKey);
         return ResponseEntity.status(HttpStatus.FOUND)
