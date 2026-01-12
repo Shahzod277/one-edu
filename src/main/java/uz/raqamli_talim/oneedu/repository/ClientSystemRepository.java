@@ -12,6 +12,20 @@ import java.util.Optional;
 public interface ClientSystemRepository extends CrudRepository<ClientSystem, Long> {
     @Query("select c from ClientSystem  c where c.active=true  and c.apiKey=?1")
     Optional<ClientSystem> findByApiKey(String apiKey);
+
     @Query("select c from ClientSystem c ")
     Page<ClientSystem> findAllActive(Pageable pageable);
+
+    @Query("""
+    select case when count(c) > 0 then true else false end
+    from ClientSystem c
+    where c.active = true
+      and c.organization.id = ?1
+""")
+boolean existsActiveByOrganizationId(Long organizationId);
+    boolean existsByApiKey(String apiKey);
+
+
+
+
 }

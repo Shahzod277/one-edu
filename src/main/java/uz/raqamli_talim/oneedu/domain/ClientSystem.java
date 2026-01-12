@@ -17,6 +17,8 @@ public class ClientSystem {
     // Masalan: KASBIY, HEMIS, DMCS
     @Column(name = "api_key", nullable = false, unique = true)
     private String apiKey;
+    private String publicKey;
+    private String privateKey;
 
     // Browser redirect (login tugagach)
     @Column(name = "redirect_url", nullable = false)
@@ -29,16 +31,12 @@ public class ClientSystem {
     @Column(name = "active", nullable = false)
     private Boolean active;
 
-    @Column(name = "org")
-    private String org;
-
-    @Column(name = "org_inn")
-    private String orgInn;
-
     @Column(name = "system_name")
     private String systemName;
 
     @Column(name = "domen")
     private String domen;
+    @ManyToOne(fetch = FetchType.LAZY)
+    private Organization organization;
 
 }

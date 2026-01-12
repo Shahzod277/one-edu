@@ -2,66 +2,71 @@ package uz.raqamli_talim.oneedu.sevice;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.raqamli_talim.oneedu.domain.ClientSystem;
-import uz.raqamli_talim.oneedu.domain.Role;
-import uz.raqamli_talim.oneedu.domain.User;
-import uz.raqamli_talim.oneedu.enums.ResponseMessage;
-import uz.raqamli_talim.oneedu.exception.NotFoundException;
+import uz.raqamli_talim.oneedu.domain.Organization;
 import uz.raqamli_talim.oneedu.model.ClientSystemDto;
-import uz.raqamli_talim.oneedu.model.JwtResponse;
-import uz.raqamli_talim.oneedu.model.LoginRequest;
 import uz.raqamli_talim.oneedu.model.ResponseDto;
 import uz.raqamli_talim.oneedu.repository.ClientSystemRepository;
-import uz.raqamli_talim.oneedu.repository.UserRepository;
-import uz.raqamli_talim.oneedu.security.JwtTokenProvider;
-import uz.raqamli_talim.oneedu.security.UserDetailsImpl;
-
-import java.util.ArrayList;
-import java.util.List;
+import uz.raqamli_talim.oneedu.repository.OrganizationRepository;
 
 @Service
 @RequiredArgsConstructor
 public class ClientSystemService {
 
     private final ClientSystemRepository repository;
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager;
-    private final JwtTokenProvider jwtTokenProvider;
+    private final OrganizationRepository organizationRepository;
+    private final RsaKeyService rsaKeyService;
+
 
     // CREATE
     @Transactional
     public ResponseDto create(ClientSystemDto dto) {
 
-        repository.findByApiKey(dto.getApiKey()).ifPresent(c -> {
-            throw new IllegalArgumentException("apiKey already exists and active");
-        });
+        // 1) Shu organization uchun active system bor-yo‘qligini tekshirish
+        if (repository.existsActiveByOrganizationId(dto.getOrganizationId())) {
+            throw new IllegalArgumentException("This organization already has an active client system (api key).");
+        }
+
+        // 2) Organization ni xavfsiz olish
+        Organization organization = organizationRepository.findById(dto.getOrganizationId())
+                .orElseThrow(() -> new IllegalArgumentException("Organization not found: " + dto.getOrganizationId()));
+
+        // 3) ApiKey generatsiya + collision bo‘lsa qayta urinish
+        String apiKey = generateUniqueApiKey();
+
+        // 4) RSA keylar
+        RsaKeyService.RsaKeys rsaKeys = rsaKeyService.generateRSA();
 
         ClientSystem cs = new ClientSystem();
-        cs.setApiKey(dto.getApiKey());
+        cs.setOrganization(organization);
+        cs.setApiKey(apiKey);
         cs.setRedirectUrl(dto.getRedirectUrl());
         cs.setPostCallbackUrl(dto.getPostCallbackUrl());
         cs.setActive(dto.getActive() != null ? dto.getActive() : true);
 
-        // qo'shimcha fieldlar
-        cs.setOrg(dto.getOrg());
-        cs.setOrgInn(dto.getOrgInn());
         cs.setDomen(dto.getDomen());
         cs.setSystemName(dto.getSystemName());
 
+        cs.setPublicKey(rsaKeys.publicKeyPem());
+        cs.setPrivateKey(rsaKeys.privateKeyPem());
+
         ClientSystem saved = repository.save(cs);
         return ResponseDto.success(toDto(saved));
+    }
+
+    // Unique apiKey generator (3 marta urunadi)
+    private String generateUniqueApiKey() {
+        for (int i = 0; i < 3; i++) {
+            String key = rsaKeyService.generateApiKey(); // yoki ApiKeyUtil.generateApiKey()
+            if (!repository.existsByApiKey(key)) {       // repository'da boolean existsByApiKey(String apiKey) bo‘lsin
+                return key;
+            }
+        }
+        throw new IllegalStateException("Could not generate unique apiKey, please retry.");
     }
 
 
@@ -90,28 +95,22 @@ public class ClientSystemService {
                 .map(this::toDto);
     }
 
-    // UPDATE
+    // UPDATE (apiKey, publicKey, privateKey o‘zgarmaydi)
     @Transactional
     public ResponseDto update(Long id, ClientSystemDto dto) {
 
         ClientSystem cs = repository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("ClientSystem not found"));
+                .orElseThrow(() -> new EntityNotFoundException("ClientSystem not found: " + id));
 
-        // apiKey boshqa active tizimda band emasligini tekshirish
-        repository.findByApiKey(dto.getApiKey()).ifPresent(existing -> {
-            if (!existing.getId().equals(id)) {
-                throw new IllegalArgumentException("apiKey already exists and active");
-            }
-        });
+        // apiKey/public/private SET QILINMAYDI (o‘zgarmaydi)
 
-        // hamma field set (PUT kabi)
-        cs.setApiKey(dto.getApiKey());
         cs.setRedirectUrl(dto.getRedirectUrl());
         cs.setPostCallbackUrl(dto.getPostCallbackUrl());
-        cs.setActive(dto.getActive());
 
-        cs.setOrg(dto.getOrg());
-        cs.setOrgInn(dto.getOrgInn());
+        if (dto.getActive() != null) {
+            cs.setActive(dto.getActive());
+        }
+
         cs.setDomen(dto.getDomen());
         cs.setSystemName(dto.getSystemName());
 
@@ -137,39 +136,19 @@ public class ClientSystemService {
         ClientSystemDto dto = new ClientSystemDto();
         dto.setId(cs.getId());
         dto.setApiKey(cs.getApiKey());
+
         dto.setRedirectUrl(cs.getRedirectUrl());
         dto.setPostCallbackUrl(cs.getPostCallbackUrl());
         dto.setActive(cs.getActive());
-        dto.setOrg(cs.getOrg());
-        dto.setOrgInn(cs.getOrgInn());
+
         dto.setDomen(cs.getDomen());
         dto.setSystemName(cs.getSystemName());
+
+        dto.setOrganizationId(cs.getOrganization().getId());
+        dto.setOrganization(cs.getOrganization().getName());
+        dto.setPrivateKey(cs.getPrivateKey());
+
         return dto;
     }
 
-
-    @Transactional
-    public ResponseDto signIn(LoginRequest request) {
-
-        User user = userRepository.findActiveUserByPinfl(request.getUsername())
-                .orElseThrow(() -> new NotFoundException(ResponseMessage.NOT_FOUND.getMessage()));
-
-        boolean matches = passwordEncoder.matches(request.getPassword(), user.getPassword());
-        if (!matches) {
-            return new ResponseDto(HttpStatus.UNAUTHORIZED.value(), "Login yoki parol noto'g'ri", false);
-        }
-
-        Authentication authenticate = authenticationManager
-                .authenticate(new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
-        SecurityContextHolder.getContext().setAuthentication(authenticate);
-        UserDetailsImpl userDetails = (UserDetailsImpl) authenticate.getPrincipal();
-        assert userDetails != null;
-        String jwtToken = jwtTokenProvider.generateJWTToken(userDetails);
-
-        JwtResponse jwtResponse = new JwtResponse();
-        jwtResponse.setJwtToken(jwtToken);
-        jwtResponse.setRoles(user.getRoles().stream().map(Role::getName).toList());
-
-        return new ResponseDto(HttpStatus.OK.value(), ResponseMessage.SUCCESSFULLY.getMessage(), jwtResponse);
-    }
 }

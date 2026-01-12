@@ -14,13 +14,13 @@ import java.util.Set;
 public class UserDetailsImpl implements UserDetails {
 
     @Getter
-    private final Integer id;
+    private final Long id;
     private final String pinfl;
     @JsonIgnore
     private final String password;
     private final Collection<? extends GrantedAuthority> authorities;
 
-    public UserDetailsImpl(Integer id, String pinfl, String password, Collection<? extends GrantedAuthority> authorities) {
+    public UserDetailsImpl(Long id, String pinfl, String password, Collection<? extends GrantedAuthority> authorities) {
 
         this.id = id;
         this.pinfl = pinfl;

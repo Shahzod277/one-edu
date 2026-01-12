@@ -44,7 +44,7 @@ public class AuthController {
 
     @PostMapping("public/signIn")
     public ResponseEntity<?> signIn(@RequestBody LoginRequest request) {
-        ResponseDto response = clientSystemService.signIn(request);
+        ResponseDto response = authService.signIn(request);
         return new ResponseEntity<>(response, HttpStatus.valueOf(response.getCode()));
 
     }
