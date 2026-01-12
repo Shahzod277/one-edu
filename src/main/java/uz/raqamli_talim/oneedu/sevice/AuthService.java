@@ -49,6 +49,7 @@ public class AuthService {
     public URI redirectOneIdUrlAdmin(String apiKey) {
         return oneIdServiceApiAdmin.redirectOneIdUrl(apiKey);
     }
+
     public Mono<URI> oneIdAdminSignInAndRedirect(String code, String apiKey) {
 
         ClientSystem clientSystem = clientSystemRepository
@@ -62,23 +63,25 @@ public class AuthService {
         OneIdTokenResponse oneIdToken = oneIdServiceApiAdmin.getAccessAndRefreshToken(code);
         OneIdResponseUserInfo userInfo = oneIdServiceApiAdmin.getUserInfo(oneIdToken.getAccess_token());
 
-        // userInfo yo‘q bo‘lsa — client redirectUrl ga qaytar
         if (userInfo == null || userInfo.getPin() == null) {
             return Mono.just(URI.create(clientSystem.getRedirectUrl()));
         }
 
-        // ✅ Browser’ni stat callback’ga yuboramiz (bitta redirect)
+        // ✅ bitta payload
+        String payload = userInfo.getPin() + "|" + userInfo.getPportNo(); // pinfl|passport
+
+        // ✅ client public key bilan shifrlaymiz
+        String encrypted = RsaKeyService.encrypt(clientSystem.getPublicKey(), payload);
+
+        // ✅ endi bitta param yuboriladi
         URI callbackUri = UriComponentsBuilder
-                .fromUriString(clientSystem.getPostCallbackUrl()) // https://stat.edu.uz/api/auth-user/callback
-                .queryParam("pinfl", userInfo.getPin())
-                .queryParam("serialNumber", userInfo.getPportNo())
+                .fromUriString(clientSystem.getPostCallbackUrl())
+                .queryParam("data", encrypted)
                 .build(true)
                 .toUri();
 
         return Mono.just(callbackUri);
     }
-
-
 
 
     @Transactional
