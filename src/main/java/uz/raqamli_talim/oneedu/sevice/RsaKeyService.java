@@ -47,28 +47,24 @@ public class RsaKeyService {
     }
 
 
-    public static String encrypt(String publicKey, String message) {
+    public static String encrypt(String publicKeyBase64, String message) {
         try {
-            byte[] publicKeyBytes = Base64.getDecoder().decode(publicKey);
-
-            PublicKey publicKeyObj = KeyFactory.getInstance("RSA")
+            byte[] publicKeyBytes = Base64.getDecoder().decode(publicKeyBase64);
+            PublicKey publicKey = KeyFactory.getInstance("RSA")
                     .generatePublic(new X509EncodedKeySpec(publicKeyBytes));
 
             Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, publicKeyObj);
+            cipher.init(Cipher.ENCRYPT_MODE, publicKey);
 
-            byte[] encryptedBytes = cipher.doFinal(message.getBytes(StandardCharsets.UTF_8));
+            byte[] encrypted = cipher.doFinal(message.getBytes(StandardCharsets.UTF_8));
 
-            // JSON body uchun ok:
-            return Base64.getEncoder().encodeToString(encryptedBytes);
-
-            // Redirect URL uchun yaxshiroq:
-            // return Base64.getUrlEncoder().withoutPadding().encodeToString(encryptedBytes);
-
+            // ✅ URL-safe, '=' yo‘q, '+' '/' yo‘q
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(encrypted);
         } catch (Exception e) {
-            throw new IllegalStateException("RSA encrypt failed", e);
+            throw new IllegalStateException("Encrypt failed", e);
         }
     }
+
 
 
 }
