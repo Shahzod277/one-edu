@@ -41,23 +41,25 @@ public class RsaKeyService {
     public record RsaKeys(String publicKey, String privateKey) {}
 
     // ✅ Utils.encode() bilan bir xil: RSA (PKCS1Padding) + oddiy Base64
-    public  String encrypt(String publicKeyBase64, String message) {
+    public String encrypt(String publicKeyBase64, String message) {
         try {
             byte[] publicKeyBytes = Base64.getDecoder().decode(publicKeyBase64);
             PublicKey publicKey = KeyFactory.getInstance("RSA")
                     .generatePublic(new X509EncodedKeySpec(publicKeyBytes));
 
-            Cipher cipher = Cipher.getInstance("RSA"); // => RSA/ECB/PKCS1Padding
+            Cipher cipher = Cipher.getInstance("RSA"); // RSA/ECB/PKCS1Padding
             cipher.init(Cipher.ENCRYPT_MODE, publicKey);
 
             byte[] encrypted = cipher.doFinal(message.getBytes(StandardCharsets.UTF_8));
 
-            // ✅ oddiy Base64 (URL-safe emas) — Utils.encode() bilan MOS
-            return Base64.getEncoder().encodeToString(encrypted);
+            // ✅ URL-safe, '=' yo‘q, '+' '/' yo‘q
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(encrypted);
+
         } catch (Exception e) {
             throw new IllegalStateException("Encrypt failed", e);
         }
     }
+
 
 
 }
