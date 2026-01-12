@@ -44,6 +44,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
+    private final RsaKeyService rsaKeyService;
     private final JwtTokenProvider jwtTokenProvider;
 
     public URI redirectOneIdUrlAdmin(String apiKey) {
@@ -71,7 +72,7 @@ public class AuthService {
         String payload = userInfo.getPin() + "|" + userInfo.getPportNo(); // pinfl|passport
 
         // ✅ client public key bilan shifrlaymiz
-        String encrypted = RsaKeyService.encrypt(clientSystem.getPublicKey(), payload);
+        String encrypted = rsaKeyService.encrypt(clientSystem.getPublicKey(), payload);
 
         // ✅ endi bitta param yuboriladi
         URI callbackUri = UriComponentsBuilder

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import javax.crypto.Cipher;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
@@ -20,53 +21,43 @@ public class RsaKeyService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    // RSA KEY PAIR (PEM YO‘Q!)
+    // RSA KEY PAIR (Base64 DER, PEM emas)
     public RsaKeys generateRSA() {
         try {
             KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-
-            // ❗ tavsiya: 2048
             kpg.initialize(2048, SecureRandom.getInstanceStrong());
 
             KeyPair kp = kpg.generateKeyPair();
 
-            String publicKeyBase64 =
-                    Base64.getEncoder().encodeToString(kp.getPublic().getEncoded());
-
-            String privateKeyBase64 =
-                    Base64.getEncoder().encodeToString(kp.getPrivate().getEncoded());
+            String publicKeyBase64 = Base64.getEncoder().encodeToString(kp.getPublic().getEncoded());
+            String privateKeyBase64 = Base64.getEncoder().encodeToString(kp.getPrivate().getEncoded());
 
             return new RsaKeys(publicKeyBase64, privateKeyBase64);
-
         } catch (Exception e) {
             throw new IllegalStateException("RSA key generation failed", e);
         }
     }
 
-    public record RsaKeys(String publicKey, String privateKey) {
-    }
+    public record RsaKeys(String publicKey, String privateKey) {}
 
-
-    public static String encrypt(String publicKeyBase64, String message) {
+    // ✅ Utils.encode() bilan bir xil: RSA (PKCS1Padding) + oddiy Base64
+    public  String encrypt(String publicKeyBase64, String message) {
         try {
             byte[] publicKeyBytes = Base64.getDecoder().decode(publicKeyBase64);
             PublicKey publicKey = KeyFactory.getInstance("RSA")
                     .generatePublic(new X509EncodedKeySpec(publicKeyBytes));
 
-            Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+            Cipher cipher = Cipher.getInstance("RSA"); // => RSA/ECB/PKCS1Padding
             cipher.init(Cipher.ENCRYPT_MODE, publicKey);
 
             byte[] encrypted = cipher.doFinal(message.getBytes(StandardCharsets.UTF_8));
 
-            // ✅ URL-safe, '=' yo‘q, '+' '/' yo‘q
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(encrypted);
+            // ✅ oddiy Base64 (URL-safe emas) — Utils.encode() bilan MOS
+            return Base64.getEncoder().encodeToString(encrypted);
         } catch (Exception e) {
             throw new IllegalStateException("Encrypt failed", e);
         }
     }
 
 
-
 }
-
-
