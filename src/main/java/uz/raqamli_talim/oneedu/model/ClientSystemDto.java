@@ -12,13 +12,19 @@ import lombok.Setter;
 public class ClientSystemDto {
     private Long id;
     private String apiKey;
-    private String privateKey;
+
     private String redirectUrl;
     private String postCallbackUrl;
     private Boolean active;
+
     private Long organizationId;
     private String organization;
-    //    private String org;
+
     private String systemName;
     private String domen;
+
+    // 🔐 faqat public key
+    private String privateKey;
+
+
 }

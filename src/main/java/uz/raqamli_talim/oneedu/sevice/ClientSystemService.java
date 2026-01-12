@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import uz.raqamli_talim.oneedu.domain.ClientSystem;
 import uz.raqamli_talim.oneedu.domain.Organization;
 import uz.raqamli_talim.oneedu.model.ClientSystemDto;
+import uz.raqamli_talim.oneedu.model.ClientSystemRequest;
 import uz.raqamli_talim.oneedu.model.ResponseDto;
 import uz.raqamli_talim.oneedu.repository.ClientSystemRepository;
 import uz.raqamli_talim.oneedu.repository.OrganizationRepository;
@@ -24,7 +25,7 @@ public class ClientSystemService {
 
     // CREATE
     @Transactional
-    public ResponseDto create(ClientSystemDto dto) {
+    public ResponseDto create(ClientSystemRequest dto) {
 
         // 1) Shu organization uchun active system bor-yo‘qligini tekshirish
         if (repository.existsActiveByOrganizationId(dto.getOrganizationId())) {
@@ -51,8 +52,8 @@ public class ClientSystemService {
         cs.setDomen(dto.getDomen());
         cs.setSystemName(dto.getSystemName());
 
-        cs.setPublicKey(rsaKeys.publicKeyPem());
-        cs.setPrivateKey(rsaKeys.privateKeyPem());
+        cs.setPublicKey(rsaKeys.publicKey());
+        cs.setPrivateKey(rsaKeys.privateKey());
 
         ClientSystem saved = repository.save(cs);
         return ResponseDto.success(toDto(saved));
@@ -97,7 +98,7 @@ public class ClientSystemService {
 
     // UPDATE (apiKey, publicKey, privateKey o‘zgarmaydi)
     @Transactional
-    public ResponseDto update(Long id, ClientSystemDto dto) {
+    public ResponseDto update(Long id, ClientSystemRequest dto) {
 
         ClientSystem cs = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("ClientSystem not found: " + id));

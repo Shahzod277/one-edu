@@ -17,7 +17,9 @@ public class ClientSystem {
     // Masalan: KASBIY, HEMIS, DMCS
     @Column(name = "api_key", nullable = false, unique = true)
     private String apiKey;
+    @Column(name = "public_key", columnDefinition = "TEXT")
     private String publicKey;
+    @Column(name = "private_key", columnDefinition = "TEXT")
     private String privateKey;
 
     // Browser redirect (login tugagach)
