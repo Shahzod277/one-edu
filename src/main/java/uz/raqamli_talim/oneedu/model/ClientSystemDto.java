@@ -14,7 +14,6 @@ public class ClientSystemDto {
     private String apiKey;
 
     private String redirectUrl;
-    private String postCallbackUrl;
     private Boolean active;
 
     private Long organizationId;
