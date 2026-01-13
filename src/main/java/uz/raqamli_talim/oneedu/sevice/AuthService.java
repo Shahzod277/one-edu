@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import uz.raqamli_talim.oneedu.domain.Audit;
 import uz.raqamli_talim.oneedu.domain.ClientSystem;
 import uz.raqamli_talim.oneedu.domain.Role;
 import uz.raqamli_talim.oneedu.domain.User;
@@ -25,6 +27,7 @@ import uz.raqamli_talim.oneedu.exception.NotFoundException;
 import uz.raqamli_talim.oneedu.model.JwtResponse;
 import uz.raqamli_talim.oneedu.model.LoginRequest;
 import uz.raqamli_talim.oneedu.model.ResponseDto;
+import uz.raqamli_talim.oneedu.repository.AuditRepository;
 import uz.raqamli_talim.oneedu.repository.ClientSystemRepository;
 import uz.raqamli_talim.oneedu.repository.UserRepository;
 import uz.raqamli_talim.oneedu.security.JwtTokenProvider;
@@ -42,6 +45,7 @@ public class AuthService {
     private final ClientSystemRepository clientSystemRepository;
     private final WebClient webClient;
     private final UserRepository userRepository;
+    private final AuditRepository auditRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final RsaKeyService rsaKeyService;
@@ -53,38 +57,59 @@ public class AuthService {
 
     public Mono<URI> oneIdAdminSignInAndRedirect(String code, String apiKey) {
 
-        ClientSystem clientSystem = clientSystemRepository
-                .findByApiKey(apiKey)
-                .orElseThrow(() -> new NotFoundException("Sizga ruxsat yo‘q"));
+        return Mono.fromCallable(() ->
+                        clientSystemRepository.findByApiKey(apiKey)
+                                .orElseThrow(() -> new NotFoundException("Sizga ruxsat yo‘q"))
+                )
+                .subscribeOn(Schedulers.boundedElastic()) // ✅ JPA find blocking
+                .flatMap(clientSystem -> {
 
-        if (!Boolean.TRUE.equals(clientSystem.getActive())) {
-            throw new NotFoundException("Sizga ruxsat yo‘q");
-        }
+                    if (!Boolean.TRUE.equals(clientSystem.getActive())) {
+                        return saveAudit(clientSystem, null, true) // error=true yoki alohida status
+                                .then(Mono.error(new NotFoundException("Sizga ruxsat yo‘q")));
+                    }
 
-        OneIdTokenResponse oneIdToken = oneIdServiceApiAdmin.getAccessAndRefreshToken(code);
-        OneIdResponseUserInfo userInfo = oneIdServiceApiAdmin.getUserInfo(oneIdToken.getAccess_token());
+                    return Mono.fromCallable(() -> {
+                                OneIdTokenResponse token = oneIdServiceApiAdmin.getAccessAndRefreshToken(code);
+                                OneIdResponseUserInfo userInfo = oneIdServiceApiAdmin.getUserInfo(token.getAccess_token());
+                                String payload = userInfo.getPin() + "|" + userInfo.getPportNo();
+                                String encrypted = rsaKeyService.encrypt(clientSystem.getPublicKey(), payload);
 
-        if (userInfo == null || userInfo.getPin() == null) {
-            return Mono.just(URI.create(clientSystem.getRedirectUrl()));
-        }
+                                URI callbackUri = UriComponentsBuilder
+                                        .fromUriString(clientSystem.getRedirectUrl())
+                                        .queryParam("data", encrypted)
+                                        .build(true)
+                                        .toUri();
 
-        // ✅ bitta payload
-        String payload = userInfo.getPin() + "|" + userInfo.getPportNo(); // pinfl|passport
-
-        // ✅ client public key bilan shifrlaymiz
-        String encrypted = rsaKeyService.encrypt(clientSystem.getPublicKey(), payload);
-
-        // ✅ endi bitta param yuboriladi
-        URI callbackUri = UriComponentsBuilder
-                .fromUriString(clientSystem.getRedirectUrl())
-                .queryParam("data", encrypted)
-                .build(true)
-                .toUri();
-
-        return Mono.just(callbackUri);
+                                return new Result(callbackUri, userInfo.getPin());
+                            })
+                            .subscribeOn(Schedulers.boundedElastic()) // ✅ OneID call + encrypt (ehtiyot uchun)
+                            .flatMap(res ->
+                                    saveAudit(clientSystem, res.pinfl(), false) // ✅ JPA save blocking
+                                            .thenReturn(res.uri())
+                            )
+                            .onErrorResume(e ->
+                                    saveAudit(clientSystem, null, true)
+                                            .then(Mono.error(e))
+                            );
+                });
     }
 
+    /** JPA save blocking bo‘lgani uchun boundedElastic’da yozamiz */
+    private Mono<Void> saveAudit(ClientSystem clientSystem, String pinfl, boolean error) {
+        return Mono.fromRunnable(() -> {
+                    Audit audit = new Audit();
+                    audit.setClientSystem(clientSystem);
+                    audit.setPinfl(pinfl);      // ⚠️ xohlasang hash qilamiz
+                    audit.setError(error);
+                    auditRepository.save(audit);
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
+    }
 
+    /** ichki kichik record */
+    private record Result(URI uri, String pinfl) {}
     @Transactional
     public ResponseDto signIn(LoginRequest request) {
 

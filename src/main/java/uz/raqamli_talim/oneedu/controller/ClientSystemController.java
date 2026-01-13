@@ -27,10 +27,10 @@ public class ClientSystemController {
 
     // CREATE
     @PostMapping
-//    @PreAuthorize("isAuthenticated()")
-//    @Operation(
-//            security = {@SecurityRequirement(name = "bearer-key")}
-//    )
+    @PreAuthorize("isAuthenticated()")
+    @Operation(
+            security = {@SecurityRequirement(name = "bearer-key")}
+    )
     public ResponseDto create(@RequestBody ClientSystemRequest dto) {
         return service.create(dto);
     }
