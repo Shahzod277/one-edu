@@ -22,4 +22,5 @@ public class ClientSystemRequest {
 
     // create’da default true bo‘lsin desang, buni umuman olib tashlash ham mumkin
     private Boolean active;
+    private Boolean isPushed;
 }

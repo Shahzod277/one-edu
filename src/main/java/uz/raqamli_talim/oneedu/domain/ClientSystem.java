@@ -40,5 +40,6 @@ public class ClientSystem {
     private Organization organization;
 
     private Boolean isUpdatedHemis;
+    private Boolean isPushed;
     private LocalDateTime isUpdatedHemisTime;
 }

@@ -22,6 +22,7 @@ public class ClientSystemDto {
     private String systemName;
     private String domen;
     private Boolean isUpdatedHemis;
+    private Boolean isPushed;
     private LocalDateTime isUpdatedHemisTime;
 
 

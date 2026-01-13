@@ -50,6 +50,7 @@ public class ClientSystemService {
         ClientSystem cs = new ClientSystem();
         cs.setOrganization(organization);
         cs.setApiKey(apiKey);
+        cs.setIsPushed(dto.getIsPushed());
         cs.setRedirectUrl(dto.getRedirectUrl());
         cs.setActive(dto.getActive() != null ? dto.getActive() : true);
 
@@ -117,6 +118,7 @@ public class ClientSystemService {
         }
 
         cs.setDomen(dto.getDomen());
+        cs.setIsPushed(dto.getIsPushed());
         cs.setSystemName(dto.getSystemName());
 
         ClientSystem saved = repository.save(cs);
@@ -147,6 +149,7 @@ public class ClientSystemService {
 
         dto.setDomen(cs.getDomen());
         dto.setSystemName(cs.getSystemName());
+        dto.setIsPushed(cs.getIsPushed());
 
         dto.setOrganizationId(cs.getOrganization().getId());
         dto.setOrganization(cs.getOrganization().getName());
