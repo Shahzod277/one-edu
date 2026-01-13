@@ -71,6 +71,7 @@ public class ClientSystemService {
 
 
     // READ by ID
+    @Transactional(readOnly = true)
     public ClientSystemDto getById(Long id) {
         ClientSystem cs = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("ClientSystem not found"));
