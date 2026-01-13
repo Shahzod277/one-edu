@@ -1,9 +1,9 @@
 package uz.raqamli_talim.oneedu.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -22,6 +22,7 @@ public class ClientSystemDto {
     private String systemName;
     private String domen;
     private Boolean isUpdatedHemis;
+    private LocalDateTime isUpdatedHemisTime;
 
 
     // 🔐 faqat public key

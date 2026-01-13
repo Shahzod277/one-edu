@@ -16,6 +16,8 @@ import uz.raqamli_talim.oneedu.model.ResponseDto;
 import uz.raqamli_talim.oneedu.repository.ClientSystemRepository;
 import uz.raqamli_talim.oneedu.repository.OrganizationRepository;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class ClientSystemService {
@@ -150,6 +152,7 @@ public class ClientSystemService {
         dto.setOrganization(cs.getOrganization().getName());
         dto.setPrivateKey(cs.getPrivateKey());
         dto.setIsUpdatedHemis(cs.getIsUpdatedHemis());
+        dto.setIsUpdatedHemisTime(cs.getIsUpdatedHemisTime());
 
         return dto;
     }
@@ -184,6 +187,7 @@ public class ClientSystemService {
 
         } catch (Exception e) {
             cs.setIsUpdatedHemis(false);
+            cs.setIsUpdatedHemisTime(LocalDateTime.now());
             repository.save(cs);
 
             return new ResponseDto(
