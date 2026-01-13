@@ -142,7 +142,6 @@ public class ClientSystemService {
     private ClientSystemDto toDto(ClientSystem cs) {
         ClientSystemDto dto = new ClientSystemDto();
         dto.setId(cs.getId());
-        dto.setApiKey(cs.getApiKey());
 
         dto.setRedirectUrl(cs.getRedirectUrl());
         dto.setActive(cs.getActive());
@@ -150,10 +149,13 @@ public class ClientSystemService {
         dto.setDomen(cs.getDomen());
         dto.setSystemName(cs.getSystemName());
         dto.setIsPushed(cs.getIsPushed());
-
+        if (!cs.getIsPushed()) {
+            dto.setPrivateKey(cs.getPrivateKey());
+            dto.setApiKey(cs.getApiKey());
+        }
         dto.setOrganizationId(cs.getOrganization().getId());
         dto.setOrganization(cs.getOrganization().getName());
-        dto.setPrivateKey(cs.getPrivateKey());
+
         dto.setIsUpdatedHemis(cs.getIsUpdatedHemis());
         dto.setIsUpdatedHemisTime(cs.getIsUpdatedHemisTime());
 
