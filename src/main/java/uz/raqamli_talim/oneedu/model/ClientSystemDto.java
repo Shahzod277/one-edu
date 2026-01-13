@@ -21,6 +21,8 @@ public class ClientSystemDto {
 
     private String systemName;
     private String domen;
+    private Boolean isUpdatedHemis;
+
 
     // 🔐 faqat public key
     private String privateKey;

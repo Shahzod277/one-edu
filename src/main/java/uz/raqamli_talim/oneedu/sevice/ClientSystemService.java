@@ -149,6 +149,7 @@ public class ClientSystemService {
         dto.setOrganizationId(cs.getOrganization().getId());
         dto.setOrganization(cs.getOrganization().getName());
         dto.setPrivateKey(cs.getPrivateKey());
+        dto.setIsUpdatedHemis(cs.getIsUpdatedHemis());
 
         return dto;
     }
