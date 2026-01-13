@@ -4,8 +4,10 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
 import uz.raqamli_talim.oneedu.domain.ClientSystem;
 import uz.raqamli_talim.oneedu.domain.Organization;
 import uz.raqamli_talim.oneedu.model.ClientSystemDto;
@@ -21,6 +23,7 @@ public class ClientSystemService {
     private final ClientSystemRepository repository;
     private final OrganizationRepository organizationRepository;
     private final RsaKeyService rsaKeyService;
+    private final HemisAuthConfigService hemisAuthConfigService;
 
 
     // CREATE
@@ -149,5 +152,46 @@ public class ClientSystemService {
 
         return dto;
     }
+
+    @Transactional
+    public ResponseDto postHEMIS(Long id) {
+
+        ClientSystem cs = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("ClientSystem not found"));
+
+        try {
+            Boolean hemisSuccess = hemisAuthConfigService.setKeys(
+                    cs.getPrivateKey(),                   // ⚠️ to‘g‘risi shu
+                    cs.getApiKey(),
+                    cs.getOrganization().getCode()
+            ).block();
+
+            boolean updated = Boolean.TRUE.equals(hemisSuccess);
+
+            cs.setIsUpdatedHemis(updated);
+            repository.save(cs);
+
+            if (updated) {
+                return ResponseDto.success("HEMIS muvaffaqiyatli qabul qildi");
+            } else {
+                return new ResponseDto(
+                        HttpStatus.BAD_REQUEST.value(),
+                        "HEMIS success=false qaytardi",
+                        false
+                );
+            }
+
+        } catch (Exception e) {
+            cs.setIsUpdatedHemis(false);
+            repository.save(cs);
+
+            return new ResponseDto(
+                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    "HEMIS xatolik: " + e.getMessage(),
+                    false
+            );
+        }
+    }
+
 
 }

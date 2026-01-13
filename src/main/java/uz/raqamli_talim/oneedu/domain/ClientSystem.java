@@ -37,4 +37,5 @@ public class ClientSystem {
     @ManyToOne(fetch = FetchType.LAZY)
     private Organization organization;
 
+    private Boolean isUpdatedHemis;
 }
