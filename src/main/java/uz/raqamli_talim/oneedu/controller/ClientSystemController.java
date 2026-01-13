@@ -54,8 +54,8 @@ public class ClientSystemController {
     public ClientSystemDto getByApiKey(@PathVariable String apiKey) {
         return service.getByApiKey(apiKey);
     }
-    // READ ALL (PAGE) -> Page qaytaryapti
-    // page ni siz service’da 1 dan boshlab qabul qilyapsiz (page>0 bo‘lsa -1)
+
+
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     @Operation(

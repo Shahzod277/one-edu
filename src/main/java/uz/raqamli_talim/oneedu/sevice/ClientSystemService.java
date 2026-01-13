@@ -28,9 +28,9 @@ public class ClientSystemService {
     public ResponseDto create(ClientSystemRequest dto) {
 
         // 1) Shu organization uchun active system bor-yo‘qligini tekshirish
-        if (repository.existsActiveByOrganizationId(dto.getOrganizationId())) {
-            throw new IllegalArgumentException("This organization already has an active client system (api key).");
-        }
+//        if (repository.existsActiveByOrganizationId(dto.getOrganizationId())) {
+//            throw new IllegalArgumentException("This organization already has an active client system (api key).");
+//        }
 
         // 2) Organization ni xavfsiz olish
         Organization organization = organizationRepository.findById(dto.getOrganizationId())
