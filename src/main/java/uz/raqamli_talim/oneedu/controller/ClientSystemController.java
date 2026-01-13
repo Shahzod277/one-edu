@@ -6,10 +6,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import uz.raqamli_talim.oneedu.domain.Organization;
 import uz.raqamli_talim.oneedu.model.ClientSystemDto;
 import uz.raqamli_talim.oneedu.model.ClientSystemRequest;
 import uz.raqamli_talim.oneedu.model.ResponseDto;
+import uz.raqamli_talim.oneedu.repository.OrganizationRepository;
 import uz.raqamli_talim.oneedu.sevice.ClientSystemService;
+
+import java.util.Arrays;
+import java.util.List;
 
 
 @RestController
@@ -18,13 +23,14 @@ import uz.raqamli_talim.oneedu.sevice.ClientSystemService;
 public class ClientSystemController {
 
     private final ClientSystemService service;
+    private final OrganizationRepository organizationRepository;
 
     // CREATE
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
-    @Operation(
-            security = {@SecurityRequirement(name = "bearer-key")}
-    )
+//    @PreAuthorize("isAuthenticated()")
+//    @Operation(
+//            security = {@SecurityRequirement(name = "bearer-key")}
+//    )
     public ResponseDto create(@RequestBody ClientSystemRequest dto) {
         return service.create(dto);
     }
@@ -81,5 +87,11 @@ public class ClientSystemController {
     )
     public ResponseDto deactivate(@PathVariable Long id) {
         return service.deactivate(id);
+    }
+
+
+    @GetMapping("/organizations")
+    public List<Organization> getOwnerships() {
+        return organizationRepository.findAll();
     }
 }
