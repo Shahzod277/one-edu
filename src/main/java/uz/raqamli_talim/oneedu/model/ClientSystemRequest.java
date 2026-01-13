@@ -15,9 +15,6 @@ public class ClientSystemRequest {
     @NotBlank
     private String redirectUrl;
 
-    // ixtiyoriy (kerak bo'lsa @NotBlank qilasan)
-    private String postCallbackUrl;
-
     private String domen;
 
     @NotBlank

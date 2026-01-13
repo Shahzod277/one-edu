@@ -46,7 +46,6 @@ public class ClientSystemService {
         cs.setOrganization(organization);
         cs.setApiKey(apiKey);
         cs.setRedirectUrl(dto.getRedirectUrl());
-        cs.setPostCallbackUrl(dto.getPostCallbackUrl());
         cs.setActive(dto.getActive() != null ? dto.getActive() : true);
 
         cs.setDomen(dto.getDomen());
@@ -106,7 +105,6 @@ public class ClientSystemService {
         // apiKey/public/private SET QILINMAYDI (o‘zgarmaydi)
 
         cs.setRedirectUrl(dto.getRedirectUrl());
-        cs.setPostCallbackUrl(dto.getPostCallbackUrl());
 
         if (dto.getActive() != null) {
             cs.setActive(dto.getActive());
@@ -139,7 +137,6 @@ public class ClientSystemService {
         dto.setApiKey(cs.getApiKey());
 
         dto.setRedirectUrl(cs.getRedirectUrl());
-        dto.setPostCallbackUrl(cs.getPostCallbackUrl());
         dto.setActive(cs.getActive());
 
         dto.setDomen(cs.getDomen());

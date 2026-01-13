@@ -26,10 +26,6 @@ public class ClientSystem {
     @Column(name = "redirect_url", nullable = false)
     private String redirectUrl;
 
-    // Backend → backend POST qilinadigan URL
-    @Column(name = "post_callback_url", nullable = false)
-    private String postCallbackUrl;
-
     @Column(name = "active", nullable = false)
     private Boolean active;
 

@@ -76,7 +76,7 @@ public class AuthService {
 
         // ✅ endi bitta param yuboriladi
         URI callbackUri = UriComponentsBuilder
-                .fromUriString(clientSystem.getPostCallbackUrl())
+                .fromUriString(clientSystem.getRedirectUrl())
                 .queryParam("data", encrypted)
                 .build(true)
                 .toUri();
