@@ -94,12 +94,11 @@ public class ClientSystemController {
     public List<Organization> getOwnerships() {
         return organizationRepository.findAll();
     }
-
     @PostMapping("/push-hemis/{id}")
-    @PreAuthorize("isAuthenticated()")
-    @Operation(
-            security = {@SecurityRequirement(name = "bearer-key")}
-    )
+//    @PreAuthorize("isAuthenticated()")
+//    @Operation(
+//            security = {@SecurityRequirement(name = "bearer-key")}
+//    )
     public ResponseDto postHemis(@PathVariable Long id) {
         return service.postHEMIS(id);
     }

@@ -173,6 +173,8 @@ public class ClientSystemService {
             boolean updated = Boolean.TRUE.equals(hemisSuccess);
 
             cs.setIsUpdatedHemis(updated);
+            cs.setIsUpdatedHemisTime(LocalDateTime.now());
+
             repository.save(cs);
 
             if (updated) {
