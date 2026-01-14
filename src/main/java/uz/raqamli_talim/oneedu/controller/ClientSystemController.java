@@ -63,9 +63,20 @@ public class ClientSystemController {
     )
     public Page<ClientSystemDto> getAllAsPage(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Long organizationId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false) Boolean isPushed
     ) {
-        return service.getAllAsPage(page, size);
+        return service.getAllAsPage(
+                page,
+                size,
+                organizationId,
+                search,
+                active,
+                isPushed
+        );
     }
 
     // UPDATE

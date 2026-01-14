@@ -4,6 +4,8 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -94,14 +96,27 @@ public class ClientSystemService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ClientSystemDto> getAllAsPage(int page, int size) {
+    public Page<ClientSystemDto> getAllAsPage(
+            int page,
+            int size,
+            Long organizationId,
+            String search,
+            Boolean active,
+            Boolean isPushed
+    ) {
         if (page > 0) page = page - 1;
-        PageRequest pageRequest = PageRequest.of(page, size);
 
-        return repository.findAllActive(pageRequest)
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+
+        return repository.findAllWithFilter(
+                        organizationId,
+                        search,
+                        active,
+                        isPushed,
+                        pageable
+                )
                 .map(this::toDto);
     }
-
     // UPDATE (apiKey, publicKey, privateKey o‘zgarmaydi)
     @Transactional
     public ResponseDto update(Long id, ClientSystemRequest dto) {
