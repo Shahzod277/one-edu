@@ -128,14 +128,12 @@ public class HemisAuthConfigService {
         if (serial == null || serial.isBlank())
             return Mono.error(new IllegalArgumentException("serial bo'sh"));
 
-        // ✅ normalize (Signer bilan bir xil)
         pin = pin.trim().replaceAll("\\s+", "");
         serial = serial.trim().replaceAll("\\s+", "").toUpperCase();
 
         long ts = Instant.now().getEpochSecond();
-        String nonce = randomHex16bytes(); // 16 bytes -> hex
+        String nonce = randomHex16bytes();
 
-        // ✅ canonical (Signer bilan 1:1)
         String canonical =
                 "PASSPORT_LOGIN\n" +
                         pin + "\n" +
@@ -143,16 +141,13 @@ public class HemisAuthConfigService {
                         ts + "\n" +
                         nonce;
 
-        // ✅ sig = Base64(HMAC_SHA256(secret, canonical))
         String sigBase64 = hmacSha256Base64(secret, canonical);
-
-        // ✅ hash = ts:nonce:sig
         String hash = ts + ":" + nonce + ":" + sigBase64;
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("pin", pin);
         form.add("serial", serial);
-        form.add("hash", hash); // ✅ aynan shu
+        form.add("hash", hash);
 
         String finalPin = pin;
 
@@ -160,10 +155,11 @@ public class HemisAuthConfigService {
                 .switchIfEmpty(Mono.error(new RuntimeException("STAT topilmadi: pinfl=" + finalPin)))
                 .flatMap(u -> {
 
-                    if (u.getApi_url() == null || u.getApi_url().isBlank())
+                    String apiUrl = u.getApi_url();
+                    if (apiUrl == null || apiUrl.isBlank())
                         return Mono.error(new RuntimeException("STAT api_url bo'sh: pinfl=" + finalPin));
 
-                    String baseUrl = extractBaseUrl(u.getApi_url());
+                    String baseUrl = extractBaseUrl(apiUrl);
                     WebClient wc = WebClient.create(baseUrl);
 
                     return wc.post()
@@ -192,7 +188,12 @@ public class HemisAuthConfigService {
                                 if (resp.data == null || resp.data.token == null || resp.data.token.isBlank())
                                     return Mono.error(new RuntimeException("HEMIS token qaytmadi"));
 
-                                return Mono.just(new TokenData(resp.data.token, resp.data.refresh_token));
+                                return Mono.just(new TokenData(
+                                        resp.data.token,
+                                        resp.data.refresh_token,
+                                        apiUrl,
+                                        baseUrl
+                                ));
                             });
                 });
     }
@@ -229,8 +230,12 @@ public class HemisAuthConfigService {
         public String refresh_token;
     }
 
-    public record TokenData(String token, String refreshToken) {}
-
+    public record TokenData(
+            String token,
+            String refreshToken,
+            String apiUrl,   // STATdan kelgan api_url (to'liq)
+            String baseUrl   // extractBaseUrl(apiUrl)
+    ) {}
     private static String extractBaseUrl(String apiUrl) {
         if (apiUrl == null || apiUrl.isBlank()) return "";
         try {

@@ -65,16 +65,17 @@ public class MyHemisService {
                                     // ✅ HEMIS edu-id-login dan tokenni olamiz
                                     hemisAuthConfigService.eduIdLogin(userInfo.getPin(), userInfo.getPportNo())
                                             .map(tokens -> {
-                                                // ✅ Redirect: my.hemis callback
                                                 URI callbackUri = UriComponentsBuilder
                                                         .fromUriString("https://my.hemis.uz/auth/one-id-callback")
-                                                        .queryParam("token", tokens.token()) // TokenData record: token()
-                                                        // xohlasang refresh ham yubor:
-                                                        // .queryParam("refresh_token", tokens.refreshToken())
+                                                        .queryParam("token", tokens.token())
+                                                        .queryParam("api_url", tokens.apiUrl())     // ✅ STAT api_url
+//                                                        .queryParam("base_url", tokens.baseUrl())   // ✅ qisqa base
                                                         .build(true)
                                                         .toUri();
+
                                                 return new AuthService.Result(callbackUri, userInfo.getPin());
                                             })
+
                             )
                             .flatMap(res ->
                                     authService.saveAudit(clientSystem, res.pinfl(), false)
