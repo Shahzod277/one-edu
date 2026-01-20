@@ -1,6 +1,8 @@
 package uz.raqamli_talim.oneedu.sevice;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -22,55 +24,53 @@ import java.time.Instant;
 @Service
 public class HemisAuthConfigService {
 
-    // HEMIS markaziy endpoint (EduID login va public ro‘yxatlar shu yerdan)
     private final WebClient central = WebClient.create("https://student.hemis.uz");
+    private final WebClient stat    = WebClient.create("https://stat.edu.uz");
 
-    // STAT endpoint (PINFL -> university info)
-    private final WebClient stat = WebClient.create("https://stat.edu.uz");
-
-    // Secret (o'zing qo'yasan)
     private final String secret = "hG45Jkl934mLk5fFtu387cBi";
+
+    private final ObjectMapper om = new ObjectMapper();
 
     public Mono<Boolean> setKeys(String privateKey, String apiKey, String universityCode) {
 
         if (privateKey == null || privateKey.isBlank())
             return Mono.error(new IllegalArgumentException("privateKey bo'sh"));
-
         if (apiKey == null || apiKey.isBlank())
             return Mono.error(new IllegalArgumentException("apiKey bo'sh"));
-
         if (universityCode == null || universityCode.isBlank())
             return Mono.error(new IllegalArgumentException("universityCode bo'sh"));
 
         return getUniversityBaseUrl(universityCode)
                 .flatMap(baseUrl -> {
-                    System.out.println(baseUrl);
+
                     WebClient wc = WebClient.create(baseUrl);
 
-                    String body = "{\"private_key\":\"" + jsonEscape(privateKey) +
-                            "\",\"api_key\":\"" + jsonEscape(apiKey) + "\"}";
+                    AuthKeysBody reqBody = new AuthKeysBody(privateKey, apiKey);
+
+                    String jsonBody;
+                    try {
+                        // ✅ aynan yuboriladigan body'ni serialize qilib olamiz
+                        jsonBody = om.writeValueAsString(reqBody);
+                    } catch (JsonProcessingException e) {
+                        return Mono.error(new RuntimeException("JSON serialize error", e));
+                    }
 
                     String timestamp = String.valueOf(Instant.now().getEpochSecond());
-                    String signature = hmacSha256Hex(timestamp + body, secret);
+                    String signature = hmacSha256Hex(timestamp + jsonBody, secret);
 
                     return wc.post()
                             .uri("/rest/auth-config/set-keys")
-                            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                            .contentType(MediaType.APPLICATION_JSON)
                             .header("X-Timestamp", timestamp)
                             .header("X-Signature", signature)
-                            .bodyValue(new AuthKeysBody(privateKey, apiKey))
+                            .bodyValue(reqBody)
                             .retrieve()
                             .bodyToMono(HemisResponse.class)
-                            .map(resp -> Boolean.TRUE.equals(resp.success));
+                            .map(resp -> resp != null && Boolean.TRUE.equals(resp.success));
                 });
     }
 
-    /**
-     * universityCode bo'yicha api_url topib, baseUrl qaytaradi.
-     * api_url: https://student.arbu-edu.uz/rest/v1/  -> baseUrl: https://student.arbu-edu.uz
-     */
     private Mono<String> getUniversityBaseUrl(String universityCode) {
-
         return central.get()
                 .uri("/rest/v1/public/university-api-urls")
                 .retrieve()
@@ -78,26 +78,22 @@ public class HemisAuthConfigService {
                 .flatMap(json -> {
 
                     JsonNode data = json.get("data");
-                    if (data == null || !data.isArray()) {
+                    if (data == null || !data.isArray())
                         return Mono.error(new RuntimeException("university-api-urls response bo‘sh"));
-                    }
 
                     for (JsonNode u : data) {
-                        if (universityCode.equals(u.get("code").asText())) {
-                            String apiUrl = u.get("api_url").asText();
-                            return Mono.just(extractBaseUrl(apiUrl));
+                        JsonNode code = u.get("code");
+                        JsonNode api  = u.get("api_url");
+                        if (code != null && api != null && universityCode.equals(code.asText())) {
+                            return Mono.just(extractBaseUrl(api.asText()));
                         }
                     }
 
-                    return Mono.error(new RuntimeException(
-                            "universityCode topilmadi: " + universityCode
-                    ));
+                    return Mono.error(new RuntimeException("universityCode topilmadi: " + universityCode));
                 });
     }
 
-
     public Mono<UniversityApiUrlsResponse> getUniversityBaseByPinfl(String pinfl) {
-
         if (pinfl == null || pinfl.isBlank())
             return Mono.error(new IllegalArgumentException("pinfl bo'sh"));
 
@@ -108,42 +104,42 @@ public class HemisAuthConfigService {
                         .build()
                 )
                 .retrieve()
-                .onStatus(
-                        s -> s.value() == 404,
-                        r -> Mono.error(new RuntimeException("STAT: student/university topilmadi: pinfl=" + pinfl))
-                )
-                .onStatus(
-                        HttpStatusCode::is5xxServerError,
-                        r -> Mono.error(new RuntimeException("STAT tizimida uzilish bor"))
-                )
+                .onStatus(s -> s.value() == 404,
+                        r -> Mono.error(new RuntimeException("STAT: student/university topilmadi: pinfl=" + pinfl)))
+                .onStatus(HttpStatusCode::is5xxServerError,
+                        r -> Mono.error(new RuntimeException("STAT tizimida uzilish bor")))
                 .bodyToMono(UniversityApiUrlsResponse.class);
     }
-    public Mono<TokenData> eduIdLogin( String pin, String serial) {
 
+    public Mono<TokenData> eduIdLogin(String pin, String serial) {
 
         if (pin == null || pin.isBlank())
             return Mono.error(new IllegalArgumentException("pin bo'sh"));
-
         if (serial == null || serial.isBlank())
             return Mono.error(new IllegalArgumentException("serial bo'sh"));
 
-        String body = "{\"pin\":\"" + jsonEscape(pin) +
-                "\",\"serial\":\"" + jsonEscape(serial) + "\"}";
+        // ✅ normalize
+        pin = pin.trim().replaceAll("\\s+", "");
+        serial = serial.trim().replaceAll("\\s+", "").toUpperCase();
+
+        // ✅ form body (canonical) - server ko'pincha shuni tekshiradi
+        String canonical = "pin=" + urlEncode(pin) + "&serial=" + urlEncode(serial);
 
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
-        String signature = hmacSha256Hex(timestamp + body, secret);
+        String signature = hmacSha256Hex(timestamp + canonical, secret);
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("pin", pin);
         form.add("serial", serial);
+        // ⚠️ agar server "hash" fieldni ham kutsa qoldiramiz:
         form.add("hash", signature);
 
-        // ✅ PINFL bo‘yicha STATdan university info olamiz
+        String finalPin = pin;
         return getUniversityBaseByPinfl(pin)
                 .switchIfEmpty(Mono.error(new RuntimeException("STAT topilmadi: pinfl=" + pin)))
                 .flatMap(u -> {
                     if (u.getApi_url() == null || u.getApi_url().isBlank())
-                        return Mono.error(new RuntimeException("STAT api_url bo'sh: pinfl=" + pin));
+                        return Mono.error(new RuntimeException("STAT api_url bo'sh: pinfl=" + finalPin));
 
                     String baseUrl = extractBaseUrl(u.getApi_url());
                     WebClient wc = WebClient.create(baseUrl);
@@ -174,10 +170,6 @@ public class HemisAuthConfigService {
                 });
     }
 
-
-
-
-
     // ===== response DTO lar =====
     public static class EduIdLoginResponse {
         public Boolean success;
@@ -191,16 +183,13 @@ public class HemisAuthConfigService {
         public String refresh_token;
     }
 
-    // ===== sizga kerak bo‘ladigan natija =====
     public record TokenData(String token, String refreshToken) {}
-
 
     private static String extractBaseUrl(String apiUrl) {
         if (apiUrl == null || apiUrl.isBlank()) return "";
         try {
             URI uri = URI.create(apiUrl.trim());
-            String origin = uri.getScheme() + "://" + uri.getAuthority();
-            return origin;
+            return uri.getScheme() + "://" + uri.getAuthority();
         } catch (Exception e) {
             String s = apiUrl.trim().replaceAll("/+$", "");
             s = s.replace("/rest/v1", "");
@@ -208,28 +197,7 @@ public class HemisAuthConfigService {
         }
     }
 
-
-    public static class UniversityItem {
-        public String code;
-        public String name;
-        public Long tin;
-        public String api_url;
-        public String student_url;
-        public String employee_url;
-        public String university_type;
-        public String version_type;
-    }
-
     // ===== HELPERS =====
-    private static String jsonEscape(String s) {
-        return s == null ? "" : s
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
-    }
-
     private static String hmacSha256Hex(String data, String secret) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -246,5 +214,15 @@ public class HemisAuthConfigService {
         for (byte b : bytes) sb.append(String.format("%02x", b));
         return sb.toString();
     }
+
+    // form canonical uchun minimal url-encode (oddiy holat uchun yetadi)
+    private static String urlEncode(String s) {
+        return s.replace("%", "%25")
+                .replace("&", "%26")
+                .replace("=", "%3D")
+                .replace("+", "%2B")
+                .replace(" ", "%20");
+    }
+
     private record AuthKeysBody(String private_key, String api_key) {}
 }
