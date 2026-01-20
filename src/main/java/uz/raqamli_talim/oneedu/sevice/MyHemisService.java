@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
@@ -40,6 +41,7 @@ public class MyHemisService {
     private final HemisAuthConfigService hemisAuthConfigService;
 
 
+    @Transactional
     public Mono<URI> oneIdAdminSignInAndRedirect(String code, String apiKey) {
 
         return Mono.fromCallable(() ->

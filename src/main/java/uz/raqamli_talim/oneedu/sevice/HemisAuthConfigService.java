@@ -20,6 +20,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 
 @Service
 public class HemisAuthConfigService {
@@ -73,25 +74,34 @@ public class HemisAuthConfigService {
     private Mono<String> getUniversityBaseUrl(String universityCode) {
         return central.get()
                 .uri("/rest/v1/public/university-api-urls")
+                .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
-                .bodyToMono(JsonNode.class)
-                .flatMap(json -> {
+                .bodyToMono(String.class)
+                .flatMap(body -> {
+                    try {
+                        JsonNode json = om.readTree(body);
 
-                    JsonNode data = json.get("data");
-                    if (data == null || !data.isArray())
-                        return Mono.error(new RuntimeException("university-api-urls response bo‘sh"));
+                        JsonNode data = json.get("data");
+                        if (data == null || !data.isArray())
+                            return Mono.error(new RuntimeException("university-api-urls JSON noto‘g‘ri: " + body));
 
-                    for (JsonNode u : data) {
-                        JsonNode code = u.get("code");
-                        JsonNode api  = u.get("api_url");
-                        if (code != null && api != null && universityCode.equals(code.asText())) {
-                            return Mono.just(extractBaseUrl(api.asText()));
+                        for (JsonNode u : data) {
+                            String code = u.path("code").asText(null);
+                            String api  = u.path("api_url").asText(null);
+
+                            if (api != null && universityCode.equals(code)) {
+                                return Mono.just(extractBaseUrl(api));
+                            }
                         }
-                    }
 
-                    return Mono.error(new RuntimeException("universityCode topilmadi: " + universityCode));
+                        return Mono.error(new RuntimeException("universityCode topilmadi: " + universityCode));
+
+                    } catch (Exception e) {
+                        return Mono.error(new RuntimeException("university-api-urls parse error. Body=" + body, e));
+                    }
                 });
     }
+
 
     public Mono<UniversityApiUrlsResponse> getUniversityBaseByPinfl(String pinfl) {
         if (pinfl == null || pinfl.isBlank())
@@ -118,26 +128,38 @@ public class HemisAuthConfigService {
         if (serial == null || serial.isBlank())
             return Mono.error(new IllegalArgumentException("serial bo'sh"));
 
-        // ✅ normalize
+        // ✅ normalize (Signer bilan bir xil)
         pin = pin.trim().replaceAll("\\s+", "");
         serial = serial.trim().replaceAll("\\s+", "").toUpperCase();
 
-        // ✅ form body (canonical) - server ko'pincha shuni tekshiradi
-        String canonical = "pin=" + urlEncode(pin) + "&serial=" + urlEncode(serial);
+        long ts = Instant.now().getEpochSecond();
+        String nonce = randomHex16bytes(); // 16 bytes -> hex
 
-        String timestamp = String.valueOf(Instant.now().getEpochSecond());
-        String signature = hmacSha256Hex(timestamp + canonical, secret);
+        // ✅ canonical (Signer bilan 1:1)
+        String canonical =
+                "PASSPORT_LOGIN\n" +
+                        pin + "\n" +
+                        serial + "\n" +
+                        ts + "\n" +
+                        nonce;
+
+        // ✅ sig = Base64(HMAC_SHA256(secret, canonical))
+        String sigBase64 = hmacSha256Base64(secret, canonical);
+
+        // ✅ hash = ts:nonce:sig
+        String hash = ts + ":" + nonce + ":" + sigBase64;
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("pin", pin);
         form.add("serial", serial);
-        // ⚠️ agar server "hash" fieldni ham kutsa qoldiramiz:
-        form.add("hash", signature);
+        form.add("hash", hash); // ✅ aynan shu
 
         String finalPin = pin;
+
         return getUniversityBaseByPinfl(pin)
-                .switchIfEmpty(Mono.error(new RuntimeException("STAT topilmadi: pinfl=" + pin)))
+                .switchIfEmpty(Mono.error(new RuntimeException("STAT topilmadi: pinfl=" + finalPin)))
                 .flatMap(u -> {
+
                     if (u.getApi_url() == null || u.getApi_url().isBlank())
                         return Mono.error(new RuntimeException("STAT api_url bo'sh: pinfl=" + finalPin));
 
@@ -147,11 +169,16 @@ public class HemisAuthConfigService {
                     return wc.post()
                             .uri("/rest/v1/auth/edu-id-login")
                             .header(HttpHeaders.USER_AGENT, "id.edu.uz")
-                            .header("X-Timestamp", timestamp)
-                            .header("X-Signature", signature)
                             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                            .accept(MediaType.APPLICATION_JSON)
                             .body(BodyInserters.fromFormData(form))
                             .retrieve()
+                            .onStatus(HttpStatusCode::isError, r ->
+                                    r.bodyToMono(String.class)
+                                            .flatMap(b -> Mono.error(new RuntimeException(
+                                                    "HEMIS HTTP " + r.statusCode().value() + " body=" + b
+                                            )))
+                            )
                             .bodyToMono(EduIdLoginResponse.class)
                             .flatMap(resp -> {
                                 if (resp == null)
@@ -169,6 +196,25 @@ public class HemisAuthConfigService {
                             });
                 });
     }
+
+
+    private static String randomHex16bytes() {
+        byte[] nonceBytes = new byte[16];
+        new java.security.SecureRandom().nextBytes(nonceBytes);
+        return toHex(nonceBytes);
+    }
+    private static String hmacSha256Base64(String secret, String data) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            mac.init(key);
+            byte[] hmac = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(hmac);
+        } catch (Exception e) {
+            throw new RuntimeException("HMAC error", e);
+        }
+    }
+
 
     // ===== response DTO lar =====
     public static class EduIdLoginResponse {
