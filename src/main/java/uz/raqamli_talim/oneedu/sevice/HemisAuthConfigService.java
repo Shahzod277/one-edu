@@ -1,6 +1,8 @@
 package uz.raqamli_talim.oneedu.sevice;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -9,6 +11,7 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import uz.raqamli_talim.oneedu.model.HemisResponse;
+import uz.raqamli_talim.oneedu.model.UniversityApiUrlsResponse;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -19,10 +22,13 @@ import java.time.Instant;
 @Service
 public class HemisAuthConfigService {
 
-    // 1) Universitetlar ro'yxatini beradigan markaziy endpoint
+    // HEMIS markaziy endpoint (EduID login va public ro‘yxatlar shu yerdan)
     private final WebClient central = WebClient.create("https://student.hemis.uz");
 
-    // 2) Secret (o'zing qo'yasan)
+    // STAT endpoint (PINFL -> university info)
+    private final WebClient stat = WebClient.create("https://stat.edu.uz");
+
+    // Secret (o'zing qo'yasan)
     private final String secret = "hG45Jkl934mLk5fFtu387cBi";
 
     public Mono<Boolean> setKeys(String privateKey, String apiKey, String universityCode) {
@@ -64,26 +70,56 @@ public class HemisAuthConfigService {
      * api_url: https://student.arbu-edu.uz/rest/v1/  -> baseUrl: https://student.arbu-edu.uz
      */
     private Mono<String> getUniversityBaseUrl(String universityCode) {
+
         return central.get()
                 .uri("/rest/v1/public/university-api-urls")
                 .retrieve()
-                .bodyToMono(UniversityApiUrlsResponse.class)
-                .flatMap(resp -> {
-                    if (resp == null || resp.data == null)
-                        return Mono.error(new RuntimeException("university-api-urls response bo'sh"));
+                .bodyToMono(JsonNode.class)
+                .flatMap(json -> {
 
-                    return resp.data.stream()
-                            .filter(u -> universityCode.equals(u.code))
-                            .findFirst()
-                            .map(u -> Mono.just(extractBaseUrl(u.api_url)))
-                            .orElseGet(() ->
-                                    Mono.error(new RuntimeException("universityCode topilmadi: " + universityCode))
-                            );
+                    JsonNode data = json.get("data");
+                    if (data == null || !data.isArray()) {
+                        return Mono.error(new RuntimeException("university-api-urls response bo‘sh"));
+                    }
+
+                    for (JsonNode u : data) {
+                        if (universityCode.equals(u.get("code").asText())) {
+                            String apiUrl = u.get("api_url").asText();
+                            return Mono.just(extractBaseUrl(apiUrl));
+                        }
+                    }
+
+                    return Mono.error(new RuntimeException(
+                            "universityCode topilmadi: " + universityCode
+                    ));
                 });
     }
 
 
-    public Mono<TokenData> eduIdLogin(String pin, String serial) {
+    public Mono<UniversityApiUrlsResponse> getUniversityBaseByPinfl(String pinfl) {
+
+        if (pinfl == null || pinfl.isBlank())
+            return Mono.error(new IllegalArgumentException("pinfl bo'sh"));
+
+        return stat.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/integration/student/university-info-pinfl")
+                        .queryParam("pinfl", pinfl)
+                        .build()
+                )
+                .retrieve()
+                .onStatus(
+                        s -> s.value() == 404,
+                        r -> Mono.error(new RuntimeException("STAT: student/university topilmadi: pinfl=" + pinfl))
+                )
+                .onStatus(
+                        HttpStatusCode::is5xxServerError,
+                        r -> Mono.error(new RuntimeException("STAT tizimida uzilish bor"))
+                )
+                .bodyToMono(UniversityApiUrlsResponse.class);
+    }
+    public Mono<TokenData> eduIdLogin( String pin, String serial) {
+
 
         if (pin == null || pin.isBlank())
             return Mono.error(new IllegalArgumentException("pin bo'sh"));
@@ -91,44 +127,55 @@ public class HemisAuthConfigService {
         if (serial == null || serial.isBlank())
             return Mono.error(new IllegalArgumentException("serial bo'sh"));
 
-        // 1) body string (signature uchun) — setKeys dagidek
         String body = "{\"pin\":\"" + jsonEscape(pin) +
                 "\",\"serial\":\"" + jsonEscape(serial) + "\"}";
 
-        // 2) timestamp + signature (HMAC)
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String signature = hmacSha256Hex(timestamp + body, secret);
 
-        // 3) form data (HEMIS endpoint shu formatda)
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("pin", pin);
         form.add("serial", serial);
-
-        // ✅ SEN AYTGANDAY: hash = signature
         form.add("hash", signature);
 
-        return central.post()
-                .uri("/rest/v1/auth/edu-id-login")
-                .header(HttpHeaders.USER_AGENT, "id.edu.uz")
-                .header("X-Timestamp", timestamp)
-                .header("X-Signature", signature)
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .body(BodyInserters.fromFormData(form))
-                .retrieve()
-                .bodyToMono(EduIdLoginResponse.class)
-                .flatMap(resp -> {
-                    if (resp == null)
-                        return Mono.error(new RuntimeException("HEMIS response null"));
+        // ✅ PINFL bo‘yicha STATdan university info olamiz
+        return getUniversityBaseByPinfl(pin)
+                .switchIfEmpty(Mono.error(new RuntimeException("STAT topilmadi: pinfl=" + pin)))
+                .flatMap(u -> {
+                    if (u.getApi_url() == null || u.getApi_url().isBlank())
+                        return Mono.error(new RuntimeException("STAT api_url bo'sh: pinfl=" + pin));
 
-                    if (!Boolean.TRUE.equals(resp.success))
-                        return Mono.error(new RuntimeException(resp.error != null ? resp.error : "HEMIS success=false"));
+                    String baseUrl = extractBaseUrl(u.getApi_url());
+                    WebClient wc = WebClient.create(baseUrl);
 
-                    if (resp.data == null || resp.data.token == null || resp.data.token.isBlank())
-                        return Mono.error(new RuntimeException("HEMIS token qaytmadi"));
+                    return wc.post()
+                            .uri("/rest/v1/auth/edu-id-login")
+                            .header(HttpHeaders.USER_AGENT, "id.edu.uz")
+                            .header("X-Timestamp", timestamp)
+                            .header("X-Signature", signature)
+                            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                            .body(BodyInserters.fromFormData(form))
+                            .retrieve()
+                            .bodyToMono(EduIdLoginResponse.class)
+                            .flatMap(resp -> {
+                                if (resp == null)
+                                    return Mono.error(new RuntimeException("HEMIS response null"));
 
-                    return Mono.just(new TokenData(resp.data.token, resp.data.refresh_token));
+                                if (!Boolean.TRUE.equals(resp.success))
+                                    return Mono.error(new RuntimeException(
+                                            resp.error != null ? resp.error : "HEMIS success=false"
+                                    ));
+
+                                if (resp.data == null || resp.data.token == null || resp.data.token.isBlank())
+                                    return Mono.error(new RuntimeException("HEMIS token qaytmadi"));
+
+                                return Mono.just(new TokenData(resp.data.token, resp.data.refresh_token));
+                            });
                 });
     }
+
+
+
 
 
     // ===== response DTO lar =====
@@ -161,13 +208,6 @@ public class HemisAuthConfigService {
         }
     }
 
-
-    // ===== JSON response DTO =====
-    public static class UniversityApiUrlsResponse {
-        public Boolean success;
-        public String error;
-        public java.util.List<UniversityItem> data;
-    }
 
     public static class UniversityItem {
         public String code;
