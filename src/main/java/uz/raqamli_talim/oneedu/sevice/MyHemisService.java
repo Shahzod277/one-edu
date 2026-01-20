@@ -66,7 +66,7 @@ public class MyHemisService {
                                     hemisAuthConfigService.eduIdLogin(userInfo.getPin(), userInfo.getPportNo())
                                             .map(tokens -> {
                                                 URI callbackUri = UriComponentsBuilder
-                                                        .fromUriString("https://my.hemis.uz/auth/one-id-callback")
+                                                        .fromUriString("https://my1.hemis.uz/auth/one-id-callback")
                                                         .queryParam("token", tokens.token())
                                                         .queryParam("api_url", tokens.apiUrl())     // ✅ STAT api_url
 //                                                        .queryParam("base_url", tokens.baseUrl())   // ✅ qisqa base
