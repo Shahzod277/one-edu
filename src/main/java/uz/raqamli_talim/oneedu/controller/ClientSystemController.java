@@ -89,7 +89,6 @@ public class ClientSystemController {
                               @RequestBody ClientSystemRequest dto) {
         return service.update(id, dto);
     }
-
     // DELETE (soft)
     @DeleteMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
@@ -99,8 +98,6 @@ public class ClientSystemController {
     public ResponseDto deactivate(@PathVariable Long id) {
         return service.deactivate(id);
     }
-
-
     @GetMapping("/organizations")
     public List<Organization> getOwnerships() {
         return organizationRepository.findAll();

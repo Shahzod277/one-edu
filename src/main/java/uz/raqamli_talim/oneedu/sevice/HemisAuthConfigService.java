@@ -3,6 +3,9 @@ package uz.raqamli_talim.oneedu.sevice;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import uz.raqamli_talim.oneedu.model.HemisResponse;
@@ -78,6 +81,72 @@ public class HemisAuthConfigService {
                             );
                 });
     }
+
+
+    public Mono<TokenData> eduIdLogin(String pin, String serial) {
+
+        if (pin == null || pin.isBlank())
+            return Mono.error(new IllegalArgumentException("pin bo'sh"));
+
+        if (serial == null || serial.isBlank())
+            return Mono.error(new IllegalArgumentException("serial bo'sh"));
+
+        // 1) body string (signature uchun) — setKeys dagidek
+        String body = "{\"pin\":\"" + jsonEscape(pin) +
+                "\",\"serial\":\"" + jsonEscape(serial) + "\"}";
+
+        // 2) timestamp + signature (HMAC)
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+        String signature = hmacSha256Hex(timestamp + body, secret);
+
+        // 3) form data (HEMIS endpoint shu formatda)
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("pin", pin);
+        form.add("serial", serial);
+
+        // ✅ SEN AYTGANDAY: hash = signature
+        form.add("hash", signature);
+
+        return central.post()
+                .uri("/rest/v1/auth/edu-id-login")
+                .header(HttpHeaders.USER_AGENT, "id.edu.uz")
+                .header("X-Timestamp", timestamp)
+                .header("X-Signature", signature)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData(form))
+                .retrieve()
+                .bodyToMono(EduIdLoginResponse.class)
+                .flatMap(resp -> {
+                    if (resp == null)
+                        return Mono.error(new RuntimeException("HEMIS response null"));
+
+                    if (!Boolean.TRUE.equals(resp.success))
+                        return Mono.error(new RuntimeException(resp.error != null ? resp.error : "HEMIS success=false"));
+
+                    if (resp.data == null || resp.data.token == null || resp.data.token.isBlank())
+                        return Mono.error(new RuntimeException("HEMIS token qaytmadi"));
+
+                    return Mono.just(new TokenData(resp.data.token, resp.data.refresh_token));
+                });
+    }
+
+
+    // ===== response DTO lar =====
+    public static class EduIdLoginResponse {
+        public Boolean success;
+        public String error;
+        public EduIdLoginData data;
+        public Integer code;
+    }
+
+    public static class EduIdLoginData {
+        public String token;
+        public String refresh_token;
+    }
+
+    // ===== sizga kerak bo‘ladigan natija =====
+    public record TokenData(String token, String refreshToken) {}
+
 
     private static String extractBaseUrl(String apiUrl) {
         if (apiUrl == null || apiUrl.isBlank()) return "";

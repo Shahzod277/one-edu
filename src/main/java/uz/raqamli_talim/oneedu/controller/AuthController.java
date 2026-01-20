@@ -10,6 +10,7 @@ import uz.raqamli_talim.oneedu.model.LoginRequest;
 import uz.raqamli_talim.oneedu.model.ResponseDto;
 import uz.raqamli_talim.oneedu.sevice.AuthService;
 import uz.raqamli_talim.oneedu.sevice.ClientSystemService;
+import uz.raqamli_talim.oneedu.sevice.MyHemisService;
 
 import java.net.URI;
 
@@ -19,6 +20,7 @@ import java.net.URI;
 public class AuthController {
     private final AuthService authService;
     private final ClientSystemService clientSystemService;
+    private final MyHemisService myHemisService;
 
     @GetMapping("/{apiKey}")
     public ResponseEntity<?> getOneIdAdmin(@PathVariable String apiKey) {
@@ -32,20 +34,33 @@ public class AuthController {
     @GetMapping("/callback")
     public Mono<ResponseEntity<Void>> oneIdAdminSignIn(
             @RequestParam("code") String code,
-            @RequestParam("state") String state   // ⬅️ apiKey
+            @RequestParam("state") String state // apiKey
     ) {
-        return authService.oneIdAdminSignInAndRedirect(code, state)
-                .map(redirectUri ->
-                        ResponseEntity.status(HttpStatus.FOUND)
-                                .location(redirectUri)
-                                .build()
-                );
+        Mono<URI> redirectMono =
+                "my-hemis".equalsIgnoreCase(state)
+                        ? myHemisService.oneIdAdminSignInAndRedirect(code, state)
+                        : authService.oneIdAdminSignInAndRedirect(code, state);
+
+        return redirectMono.map(redirectUri ->
+                ResponseEntity.status(HttpStatus.FOUND)
+                        .location(redirectUri)
+                        .build()
+        );
     }
+
 
     @PostMapping("public/signIn")
     public ResponseEntity<?> signIn(@RequestBody LoginRequest request) {
         ResponseDto response = authService.signIn(request);
         return new ResponseEntity<>(response, HttpStatus.valueOf(response.getCode()));
 
+    }
+    @GetMapping("my-hemis")
+    public ResponseEntity<?> getOneIdAdmin() {
+        String apiKey="my-hemis";
+        URI uri = authService.redirectOneIdUrlAdmin(apiKey);
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(uri)
+                .build();
     }
 }

@@ -61,11 +61,11 @@ public class AuthService {
                         clientSystemRepository.findByApiKey(apiKey)
                                 .orElseThrow(() -> new NotFoundException("Sizga ruxsat yo‘q"))
                 )
-                .subscribeOn(Schedulers.boundedElastic()) // ✅ JPA find blocking
+                .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(clientSystem -> {
 
                     if (!Boolean.TRUE.equals(clientSystem.getActive())) {
-                        return saveAudit(clientSystem, null, true) // error=true yoki alohida status
+                        return saveAudit(clientSystem, null, true)
                                 .then(Mono.error(new NotFoundException("Sizga ruxsat yo‘q")));
                     }
 
@@ -96,7 +96,7 @@ public class AuthService {
     }
 
     /** JPA save blocking bo‘lgani uchun boundedElastic’da yozamiz */
-    private Mono<Void> saveAudit(ClientSystem clientSystem, String pinfl, boolean error) {
+    public Mono<Void> saveAudit(ClientSystem clientSystem, String pinfl, boolean error) {
         return Mono.fromRunnable(() -> {
                     Audit audit = new Audit();
                     audit.setClientSystem(clientSystem);
@@ -109,7 +109,7 @@ public class AuthService {
     }
 
     /** ichki kichik record */
-    private record Result(URI uri, String pinfl) {}
+    record Result(URI uri, String pinfl) {}
     @Transactional
     public ResponseDto signIn(LoginRequest request) {
 
