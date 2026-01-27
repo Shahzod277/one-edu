@@ -71,7 +71,7 @@ public class MyHemisService {
             authService.saveAudit(clientSystem, pin, serial, true, msg);
 
             return UriComponentsBuilder
-                    .fromUriString("https://my1.hemis.uz/auth/notFound")
+                    .fromUriString("https://my.hemis.uz/auth/notFound")
                     .build(true)
                     .toUri();
         }
