@@ -1,9 +1,10 @@
 package uz.raqamli_talim.oneedu.sevice;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -12,17 +13,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdResponseUserInfo;
+import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdServiceApiAdmin;
+import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdTokenResponse;
 import uz.raqamli_talim.oneedu.domain.Audit;
 import uz.raqamli_talim.oneedu.domain.ClientSystem;
 import uz.raqamli_talim.oneedu.domain.Role;
 import uz.raqamli_talim.oneedu.domain.User;
 import uz.raqamli_talim.oneedu.enums.ResponseMessage;
-import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdResponseUserInfo;
-import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdServiceApiAdmin;
-import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdTokenResponse;
 import uz.raqamli_talim.oneedu.exception.NotFoundException;
 import uz.raqamli_talim.oneedu.model.JwtResponse;
 import uz.raqamli_talim.oneedu.model.LoginRequest;
@@ -72,6 +74,7 @@ public class AuthService {
                     return Mono.fromCallable(() -> {
                                 OneIdTokenResponse token = oneIdServiceApiAdmin.getAccessAndRefreshToken(code);
                                 OneIdResponseUserInfo userInfo = oneIdServiceApiAdmin.getUserInfo(token.getAccess_token());
+
                                 String payload = userInfo.getPin() + "|" + userInfo.getPportNo();
                                 String encrypted = rsaKeyService.encrypt(clientSystem.getPublicKey(), payload);
 
@@ -83,25 +86,54 @@ public class AuthService {
 
                                 return new Result(callbackUri, userInfo.getPin());
                             })
-                            .subscribeOn(Schedulers.boundedElastic()) // ✅ OneID call + encrypt (ehtiyot uchun)
+                            .subscribeOn(Schedulers.boundedElastic())
                             .flatMap(res ->
-                                    saveAudit(clientSystem, res.pinfl(), false) // ✅ JPA save blocking
+                                    saveAudit(clientSystem, res.pinfl(), false)
                                             .thenReturn(res.uri())
                             )
-                            .onErrorResume(e ->
-                                    saveAudit(clientSystem, null, true)
-                                            .then(Mono.error(e))
-                            );
+                            .onErrorResume(e -> {
+                                String msg = extractHemisErrorMessage(e);
+                                return saveAudit(clientSystem, null, true, msg)
+                                        .then(Mono.error(e));
+                            });
                 });
     }
 
-    /** JPA save blocking bo‘lgani uchun boundedElastic’da yozamiz */
+    // ✅ MyHemisService da ishlatiladigan bo‘lgani uchun PUBLIC qilib qo‘ydik
+    public String extractHemisErrorMessage(Throwable e) {
+        if (e instanceof WebClientResponseException wex) {
+            String body = wex.getResponseBodyAsString();
+
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                JsonNode node = mapper.readTree(body);
+
+                if (node.hasNonNull("error")) {
+                    return node.get("error").asText();
+                }
+            } catch (Exception ignored) {}
+
+            return "HEMIS HTTP " + wex.getStatusCode().value() + " body=" + body;
+        }
+        return e.getMessage();
+    }
+
+    /** ✅ eski chaqiruvlar buzilmasin */
     public Mono<Void> saveAudit(ClientSystem clientSystem, String pinfl, boolean error) {
+        return saveAudit(clientSystem, pinfl, error, null);
+    }
+
+    /** JPA save blocking bo‘lgani uchun boundedElastic’da yozamiz */
+    public Mono<Void> saveAudit(ClientSystem clientSystem, String pinfl, boolean error, String errorMessage) {
         return Mono.fromRunnable(() -> {
                     Audit audit = new Audit();
                     audit.setClientSystem(clientSystem);
-                    audit.setPinfl(pinfl);      // ⚠️ xohlasang hash qilamiz
+                    audit.setPinfl(pinfl);
                     audit.setError(error);
+
+                    // ✅ sizning entity setter'ingiz typo bo‘lishi mumkin — shu holatda qoldirdim
+                    audit.setErrorMassage(errorMessage);
+
                     auditRepository.save(audit);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
@@ -109,7 +141,8 @@ public class AuthService {
     }
 
     /** ichki kichik record */
-    record Result(URI uri, String pinfl) {}
+    public record Result(URI uri, String pinfl) {}
+
     @Transactional
     public ResponseDto signIn(LoginRequest request) {
 
@@ -123,9 +156,10 @@ public class AuthService {
 
         Authentication authenticate = authenticationManager
                 .authenticate(new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
+
         SecurityContextHolder.getContext().setAuthentication(authenticate);
+
         UserDetailsImpl userDetails = (UserDetailsImpl) authenticate.getPrincipal();
-        assert userDetails != null;
         String jwtToken = jwtTokenProvider.generateJWTToken(userDetails);
 
         JwtResponse jwtResponse = new JwtResponse();
@@ -134,5 +168,4 @@ public class AuthService {
 
         return new ResponseDto(HttpStatus.OK.value(), ResponseMessage.SUCCESSFULLY.getMessage(), jwtResponse);
     }
-
 }

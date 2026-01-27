@@ -14,5 +14,6 @@ public class Audit extends AbstractEntity {
     private ClientSystem clientSystem;
     private String pinfl;
     private Boolean error;
+    private String errorMassage;
 
 }
