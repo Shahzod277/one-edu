@@ -15,8 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdResponseUserInfo;
 import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdServiceApiAdmin;
 import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdTokenResponse;
@@ -43,9 +41,9 @@ import java.net.URI;
 public class AuthService {
 
     private final OneIdServiceApiAdmin oneIdServiceApiAdmin;
-    private final ClientSystemRepository systemRepository;
+    private final ClientSystemRepository systemRepository;         // o'zi ishlatilmasa ham o'zgartirmadim
     private final ClientSystemRepository clientSystemRepository;
-    private final WebClient webClient;
+    private final WebClient webClient;                             // ishlatilmasa ham o'zgartirmadim
     private final UserRepository userRepository;
     private final AuditRepository auditRepository;
     private final PasswordEncoder passwordEncoder;
@@ -57,49 +55,54 @@ public class AuthService {
         return oneIdServiceApiAdmin.redirectOneIdUrl(apiKey);
     }
 
-    public Mono<URI> oneIdAdminSignInAndRedirect(String code, String apiKey) {
+    // ✅ MVC / blocking
+    public URI oneIdAdminSignInAndRedirect(String code, String apiKey) {
 
-        return Mono.fromCallable(() ->
-                        clientSystemRepository.findByApiKey(apiKey)
-                                .orElseThrow(() -> new NotFoundException("Sizga ruxsat yo‘q"))
-                )
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(clientSystem -> {
+        ClientSystem clientSystem = clientSystemRepository.findByApiKey(apiKey)
+                .orElseThrow(() -> new NotFoundException("Sizga ruxsat yo‘q"));
 
-                    if (!Boolean.TRUE.equals(clientSystem.getActive())) {
-                        return saveAudit(clientSystem, null, true)
-                                .then(Mono.error(new NotFoundException("Sizga ruxsat yo‘q")));
-                    }
+        if (!Boolean.TRUE.equals(clientSystem.getActive())) {
+            saveAudit(clientSystem, null, null, true, "Sizga ruxsat yo‘q");
+            throw new NotFoundException("Sizga ruxsat yo‘q");
+        }
 
-                    return Mono.fromCallable(() -> {
-                                OneIdTokenResponse token = oneIdServiceApiAdmin.getAccessAndRefreshToken(code);
-                                OneIdResponseUserInfo userInfo = oneIdServiceApiAdmin.getUserInfo(token.getAccess_token());
+        OneIdResponseUserInfo userInfo = null; // ✅ catchda ham ishlatish uchun
 
-                                String payload = userInfo.getPin() + "|" + userInfo.getPportNo();
-                                String encrypted = rsaKeyService.encrypt(clientSystem.getPublicKey(), payload);
+        try {
+            OneIdTokenResponse token = oneIdServiceApiAdmin.getAccessAndRefreshToken(code);
+            userInfo = oneIdServiceApiAdmin.getUserInfo(token.getAccess_token());
 
-                                URI callbackUri = UriComponentsBuilder
-                                        .fromUriString(clientSystem.getRedirectUrl())
-                                        .queryParam("data", encrypted)
-                                        .build(true)
-                                        .toUri();
+            String payload = userInfo.getPin() + "|" + userInfo.getPportNo();
+            String encrypted = rsaKeyService.encrypt(clientSystem.getPublicKey(), payload);
 
-                                return new Result(callbackUri, userInfo.getPin());
-                            })
-                            .subscribeOn(Schedulers.boundedElastic())
-                            .flatMap(res ->
-                                    saveAudit(clientSystem, res.pinfl(), false)
-                                            .thenReturn(res.uri())
-                            )
-                            .onErrorResume(e -> {
-                                String msg = extractHemisErrorMessage(e);
-                                return saveAudit(clientSystem, null, true, msg)
-                                        .then(Mono.error(e));
-                            });
-                });
+            URI callbackUri = UriComponentsBuilder
+                    .fromUriString(clientSystem.getRedirectUrl())
+                    .queryParam("data", encrypted)
+                    .build(true)
+                    .toUri();
+
+            // ✅ success audit
+            saveAudit(clientSystem, userInfo.getPin(), userInfo.getPportNo(), false, null);
+
+            return callbackUri;
+
+        } catch (Exception e) {
+            String msg = extractHemisErrorMessage(e);
+
+            // ✅ userInfo olinib ulgurgan bo‘lsa — auditga yozamiz
+            String pin = (userInfo != null) ? userInfo.getPin() : null;
+            String serial = (userInfo != null) ? userInfo.getPportNo() : null;
+
+            saveAudit(clientSystem, pin, serial, true, msg);
+
+            // ✅ eski behavior: errorni yuqoriga otish
+            RuntimeException re = (RuntimeException) e;
+            throw re;
+        }
     }
 
-    // ✅ MyHemisService da ishlatiladigan bo‘lgani uchun PUBLIC qilib qo‘ydik
+
+    // ✅ MyHemisService da ishlatiladigan bo‘lgani uchun PUBLIC
     public String extractHemisErrorMessage(Throwable e) {
         if (e instanceof WebClientResponseException wex) {
             String body = wex.getResponseBodyAsString();
@@ -118,26 +121,19 @@ public class AuthService {
         return e.getMessage();
     }
 
-    /** ✅ eski chaqiruvlar buzilmasin */
-    public Mono<Void> saveAudit(ClientSystem clientSystem, String pinfl, boolean error) {
-        return saveAudit(clientSystem, pinfl, error, null);
-    }
 
-    /** JPA save blocking bo‘lgani uchun boundedElastic’da yozamiz */
-    public Mono<Void> saveAudit(ClientSystem clientSystem, String pinfl, boolean error, String errorMessage) {
-        return Mono.fromRunnable(() -> {
-                    Audit audit = new Audit();
-                    audit.setClientSystem(clientSystem);
-                    audit.setPinfl(pinfl);
-                    audit.setError(error);
+    /** ✅ JPA save blocking bo‘lgani uchun oddiy qilib yozdik */
+    public void saveAudit(ClientSystem clientSystem, String pinfl, String serialNumber, boolean error, String errorMessage) {
+        Audit audit = new Audit();
+        audit.setClientSystem(clientSystem);
+        audit.setPinfl(pinfl);
+        audit.setSerialNumber(serialNumber);
+        audit.setError(error);
 
-                    // ✅ sizning entity setter'ingiz typo bo‘lishi mumkin — shu holatda qoldirdim
-                    audit.setErrorMassage(errorMessage);
+        // sizning entity setter'ingiz typo bo‘lishi mumkin — o‘sha holatda qoldirdim
+        audit.setErrorMassage(errorMessage);
 
-                    auditRepository.save(audit);
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .then();
+        auditRepository.save(audit);
     }
 
     /** ichki kichik record */

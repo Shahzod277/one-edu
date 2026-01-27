@@ -11,7 +11,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import uz.raqamli_talim.oneedu.model.HemisResponse;
 import uz.raqamli_talim.oneedu.model.UniversityApiUrlsResponse;
 
@@ -32,101 +32,115 @@ public class HemisAuthConfigService {
 
     private final ObjectMapper om = new ObjectMapper();
 
-    public Mono<Boolean> setKeys(String privateKey, String apiKey, String universityCode) {
+    // ✅ MVC / blocking
+    public Boolean setKeys(String privateKey, String apiKey, String universityCode) {
 
         if (privateKey == null || privateKey.isBlank())
-            return Mono.error(new IllegalArgumentException("privateKey bo'sh"));
+            throw new IllegalArgumentException("privateKey bo'sh");
         if (apiKey == null || apiKey.isBlank())
-            return Mono.error(new IllegalArgumentException("apiKey bo'sh"));
+            throw new IllegalArgumentException("apiKey bo'sh");
         if (universityCode == null || universityCode.isBlank())
-            return Mono.error(new IllegalArgumentException("universityCode bo'sh"));
+            throw new IllegalArgumentException("universityCode bo'sh");
 
-        return getUniversityBaseUrl(universityCode)
-                .flatMap(baseUrl -> {
+        String baseUrl = getUniversityBaseUrl(universityCode); // blocking
+        WebClient wc = WebClient.create(baseUrl);
 
-                    WebClient wc = WebClient.create(baseUrl);
+        AuthKeysBody reqBody = new AuthKeysBody(privateKey, apiKey);
 
-                    AuthKeysBody reqBody = new AuthKeysBody(privateKey, apiKey);
+        String jsonBody;
+        try {
+            jsonBody = om.writeValueAsString(reqBody);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("JSON serialize error", e);
+        }
 
-                    String jsonBody;
-                    try {
-                        // ✅ aynan yuboriladigan body'ni serialize qilib olamiz
-                        jsonBody = om.writeValueAsString(reqBody);
-                    } catch (JsonProcessingException e) {
-                        return Mono.error(new RuntimeException("JSON serialize error", e));
-                    }
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+        String signature = hmacSha256Hex(timestamp + jsonBody, secret);
 
-                    String timestamp = String.valueOf(Instant.now().getEpochSecond());
-                    String signature = hmacSha256Hex(timestamp + jsonBody, secret);
+        HemisResponse resp = wc.post()
+                .uri("/rest/auth-config/set-keys")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("X-Timestamp", timestamp)
+                .header("X-Signature", signature)
+                .bodyValue(reqBody)
+                .retrieve()
+                .bodyToMono(HemisResponse.class)
+                .block();
 
-                    return wc.post()
-                            .uri("/rest/auth-config/set-keys")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .header("X-Timestamp", timestamp)
-                            .header("X-Signature", signature)
-                            .bodyValue(reqBody)
-                            .retrieve()
-                            .bodyToMono(HemisResponse.class)
-                            .map(resp -> resp != null && Boolean.TRUE.equals(resp.success));
-                });
+        return resp != null && Boolean.TRUE.equals(resp.success);
     }
 
-    private Mono<String> getUniversityBaseUrl(String universityCode) {
-        return central.get()
+    // ✅ oldin private Mono edi → endi blocking String
+    private String getUniversityBaseUrl(String universityCode) {
+
+        String body = central.get()
                 .uri("/rest/v1/public/university-api-urls")
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .bodyToMono(String.class)
-                .flatMap(body -> {
-                    try {
-                        JsonNode json = om.readTree(body);
+                .block();
 
-                        JsonNode data = json.get("data");
-                        if (data == null || !data.isArray())
-                            return Mono.error(new RuntimeException("university-api-urls JSON noto‘g‘ri: " + body));
+        if (body == null || body.isBlank())
+            throw new RuntimeException("university-api-urls body bo'sh");
 
-                        for (JsonNode u : data) {
-                            String code = u.path("code").asText(null);
-                            String api  = u.path("api_url").asText(null);
+        try {
+            JsonNode json = om.readTree(body);
 
-                            if (api != null && universityCode.equals(code)) {
-                                return Mono.just(extractBaseUrl(api));
-                            }
-                        }
+            JsonNode data = json.get("data");
+            if (data == null || !data.isArray())
+                throw new RuntimeException("university-api-urls JSON noto‘g‘ri: " + body);
 
-                        return Mono.error(new RuntimeException("universityCode topilmadi: " + universityCode));
+            for (JsonNode u : data) {
+                String code = u.path("code").asText(null);
+                String api  = u.path("api_url").asText(null);
 
-                    } catch (Exception e) {
-                        return Mono.error(new RuntimeException("university-api-urls parse error. Body=" + body, e));
-                    }
-                });
+                if (api != null && universityCode.equals(code)) {
+                    return extractBaseUrl(api);
+                }
+            }
+
+            throw new RuntimeException("universityCode topilmadi: " + universityCode);
+
+        } catch (Exception e) {
+            throw new RuntimeException("university-api-urls parse error. Body=" + body, e);
+        }
     }
 
-
-    public Mono<UniversityApiUrlsResponse> getUniversityBaseByPinfl(String pinfl) {
+    // ✅ MVC / blocking
+    public UniversityApiUrlsResponse getUniversityBaseByPinfl(String pinfl) {
         if (pinfl == null || pinfl.isBlank())
-            return Mono.error(new IllegalArgumentException("pinfl bo'sh"));
+            throw new IllegalArgumentException("pinfl bo'sh");
 
-        return stat.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/api/integration/student/university-info-pinfl")
-                        .queryParam("pinfl", pinfl)
-                        .build()
-                )
-                .retrieve()
-                .onStatus(s -> s.value() == 404,
-                        r -> Mono.error(new RuntimeException("STAT: student/university topilmadi: pinfl=" + pinfl)))
-                .onStatus(HttpStatusCode::is5xxServerError,
-                        r -> Mono.error(new RuntimeException("STAT tizimida uzilish bor")))
-                .bodyToMono(UniversityApiUrlsResponse.class);
+        try {
+            return stat.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/api/integration/student/university-info-pinfl")
+                            .queryParam("pinfl", pinfl)
+                            .build()
+                    )
+                    .retrieve()
+                    .onStatus(s -> s.value() == 404,
+                            r -> r.bodyToMono(String.class)
+                                    .defaultIfEmpty("")
+                                    .map(b -> new RuntimeException("STAT: student/university topilmadi: pinfl=" + pinfl + " body=" + b)))
+                    .onStatus(HttpStatusCode::is5xxServerError,
+                            r -> r.bodyToMono(String.class)
+                                    .defaultIfEmpty("")
+                                    .map(b -> new RuntimeException("STAT tizimida uzilish bor. body=" + b)))
+                    .bodyToMono(UniversityApiUrlsResponse.class)
+                    .block();
+        } catch (WebClientResponseException e) {
+            throw new RuntimeException("STAT HTTP " + e.getStatusCode().value() + " body=" + e.getResponseBodyAsString(), e);
+        }
     }
 
-    public Mono<TokenData> eduIdLogin(String pin, String serial) {
+    // ✅ MVC / blocking
+    public TokenData eduIdLogin(String pin, String serial) {
 
         if (pin == null || pin.isBlank())
-            return Mono.error(new IllegalArgumentException("pin bo'sh"));
+            throw new IllegalArgumentException("pin bo'sh");
         if (serial == null || serial.isBlank())
-            return Mono.error(new IllegalArgumentException("serial bo'sh"));
+            throw new IllegalArgumentException("serial bo'sh");
 
         pin = pin.trim().replaceAll("\\s+", "");
         serial = serial.trim().replaceAll("\\s+", "").toUpperCase();
@@ -149,61 +163,64 @@ public class HemisAuthConfigService {
         form.add("serial", serial);
         form.add("hash", hash);
 
-        String finalPin = pin;
+        UniversityApiUrlsResponse u = getUniversityBaseByPinfl(pin);
+        if (u == null)
+            throw new RuntimeException("STAT topilmadi: pinfl=" + pin);
 
-        return getUniversityBaseByPinfl(pin)
-                .switchIfEmpty(Mono.error(new RuntimeException("STAT topilmadi: pinfl=" + finalPin)))
-                .flatMap(u -> {
+        String apiUrl = u.getApi_url();
+        if (apiUrl == null || apiUrl.isBlank())
+            throw new RuntimeException("STAT api_url bo'sh: pinfl=" + pin);
 
-                    String apiUrl = u.getApi_url();
-                    if (apiUrl == null || apiUrl.isBlank())
-                        return Mono.error(new RuntimeException("STAT api_url bo'sh: pinfl=" + finalPin));
+        String baseUrl = extractBaseUrl(apiUrl);
+        WebClient wc = WebClient.create(baseUrl);
 
-                    String baseUrl = extractBaseUrl(apiUrl);
-                    WebClient wc = WebClient.create(baseUrl);
+        try {
+            EduIdLoginResponse resp = wc.post()
+                    .uri("/rest/v1/auth/edu-id-login")
+                    .header(HttpHeaders.USER_AGENT, "id.edu.uz")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .body(BodyInserters.fromFormData(form))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, r ->
+                            r.bodyToMono(String.class)
+                                    .defaultIfEmpty("")
+                                    .map(b -> new RuntimeException(
+                                            "HEMIS HTTP " + r.statusCode().value() + " body=" + b
+                                    )))
+                    .bodyToMono(EduIdLoginResponse.class)
+                    .block();
 
-                    return wc.post()
-                            .uri("/rest/v1/auth/edu-id-login")
-                            .header(HttpHeaders.USER_AGENT, "id.edu.uz")
-                            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                            .accept(MediaType.APPLICATION_JSON)
-                            .body(BodyInserters.fromFormData(form))
-                            .retrieve()
-                            .onStatus(HttpStatusCode::isError, r ->
-                                    r.bodyToMono(String.class)
-                                            .flatMap(b -> Mono.error(new RuntimeException(
-                                                    "HEMIS HTTP " + r.statusCode().value() + " body=" + b
-                                            )))
-                            )
-                            .bodyToMono(EduIdLoginResponse.class)
-                            .flatMap(resp -> {
-                                if (resp == null)
-                                    return Mono.error(new RuntimeException("HEMIS response null"));
+            if (resp == null)
+                throw new RuntimeException("HEMIS response null");
 
-                                if (!Boolean.TRUE.equals(resp.success))
-                                    return Mono.error(new RuntimeException(
-                                            resp.error != null ? resp.error : "HEMIS success=false"
-                                    ));
+            if (!Boolean.TRUE.equals(resp.success))
+                throw new RuntimeException(resp.error != null ? resp.error : "HEMIS success=false");
 
-                                if (resp.data == null || resp.data.token == null || resp.data.token.isBlank())
-                                    return Mono.error(new RuntimeException("HEMIS token qaytmadi"));
+            if (resp.data == null || resp.data.token == null || resp.data.token.isBlank())
+                throw new RuntimeException("HEMIS token qaytmadi");
 
-                                return Mono.just(new TokenData(
-                                        resp.data.token,
-                                        resp.data.refresh_token,
-                                        apiUrl,
-                                        baseUrl
-                                ));
-                            });
-                });
+            return new TokenData(
+                    resp.data.token,
+                    resp.data.refresh_token,
+                    apiUrl,
+                    baseUrl
+            );
+
+        } catch (WebClientResponseException e) {
+            throw new RuntimeException(
+                    "HEMIS HTTP " + e.getStatusCode().value() + " body=" + e.getResponseBodyAsString(),
+                    e
+            );
+        }
     }
-
 
     private static String randomHex16bytes() {
         byte[] nonceBytes = new byte[16];
         new java.security.SecureRandom().nextBytes(nonceBytes);
         return toHex(nonceBytes);
     }
+
     private static String hmacSha256Base64(String secret, String data) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -215,7 +232,6 @@ public class HemisAuthConfigService {
             throw new RuntimeException("HMAC error", e);
         }
     }
-
 
     // ===== response DTO lar =====
     public static class EduIdLoginResponse {
@@ -233,9 +249,10 @@ public class HemisAuthConfigService {
     public record TokenData(
             String token,
             String refreshToken,
-            String apiUrl,   // STATdan kelgan api_url (to'liq)
-            String baseUrl   // extractBaseUrl(apiUrl)
+            String apiUrl,
+            String baseUrl
     ) {}
+
     private static String extractBaseUrl(String apiUrl) {
         if (apiUrl == null || apiUrl.isBlank()) return "";
         try {
@@ -248,7 +265,6 @@ public class HemisAuthConfigService {
         }
     }
 
-    // ===== HELPERS =====
     private static String hmacSha256Hex(String data, String secret) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -266,7 +282,6 @@ public class HemisAuthConfigService {
         return sb.toString();
     }
 
-    // form canonical uchun minimal url-encode (oddiy holat uchun yetadi)
     private static String urlEncode(String s) {
         return s.replace("%", "%25")
                 .replace("&", "%26")

@@ -13,6 +13,7 @@ public class Audit extends AbstractEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     private ClientSystem clientSystem;
     private String pinfl;
+    private String serialNumber;
     private Boolean error;
     private String errorMassage;
 

@@ -4,8 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Mono;
-import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdResponseUserInfo;
 import uz.raqamli_talim.oneedu.model.LoginRequest;
 import uz.raqamli_talim.oneedu.model.ResponseDto;
 import uz.raqamli_talim.oneedu.sevice.AuthService;
@@ -18,46 +16,44 @@ import java.net.URI;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
+
     private final AuthService authService;
     private final ClientSystemService clientSystemService;
     private final MyHemisService myHemisService;
 
     @GetMapping("/{apiKey}")
-    public ResponseEntity<?> getOneIdAdmin(@PathVariable String apiKey) {
+    public ResponseEntity<Void> getOneIdAdmin(@PathVariable String apiKey) {
         URI uri = authService.redirectOneIdUrlAdmin(apiKey);
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(uri)
                 .build();
     }
 
-
     @GetMapping("/callback")
-    public Mono<ResponseEntity<Void>> oneIdAdminSignIn(
+    public ResponseEntity<Void> oneIdAdminSignIn(
             @RequestParam("code") String code,
             @RequestParam("state") String state // apiKey
     ) {
-        Mono<URI> redirectMono =
+
+        URI redirectUri =
                 "my-hemis".equalsIgnoreCase(state)
                         ? myHemisService.oneIdAdminSignInAndRedirect(code, state)
                         : authService.oneIdAdminSignInAndRedirect(code, state);
 
-        return redirectMono.map(redirectUri ->
-                ResponseEntity.status(HttpStatus.FOUND)
-                        .location(redirectUri)
-                        .build()
-        );
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(redirectUri)
+                .build();
     }
-
 
     @PostMapping("public/signIn")
     public ResponseEntity<?> signIn(@RequestBody LoginRequest request) {
         ResponseDto response = authService.signIn(request);
         return new ResponseEntity<>(response, HttpStatus.valueOf(response.getCode()));
-
     }
+
     @GetMapping("my-hemis")
-    public ResponseEntity<?> getOneIdAdmin() {
-        String apiKey="my-hemis";
+    public ResponseEntity<Void> getOneIdAdmin() {
+        String apiKey = "my-hemis";
         URI uri = authService.redirectOneIdUrlAdmin(apiKey);
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(uri)

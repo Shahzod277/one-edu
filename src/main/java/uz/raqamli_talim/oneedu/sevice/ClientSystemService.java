@@ -188,7 +188,7 @@ public class ClientSystemService {
                     cs.getPrivateKey(),                   // ⚠️ to‘g‘risi shu
                     cs.getApiKey(),
                     cs.getOrganization().getCode()
-            ).block();
+            );
 
             boolean updated = Boolean.TRUE.equals(hemisSuccess);
 
