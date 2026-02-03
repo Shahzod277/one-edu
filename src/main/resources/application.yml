@@ -10,7 +10,7 @@ server:
 
 spring:
   application:
-    name: prof_edu_platform
+    name: one-edu
   datasource:
     url: jdbc:postgresql://172.18.10.42:5432/one_edu
     username: postgres
