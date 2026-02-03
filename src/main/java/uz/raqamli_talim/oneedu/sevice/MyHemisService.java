@@ -67,7 +67,6 @@ public class MyHemisService {
                 pin = ui.getPin();
                 serial = ui.getPportNo();
             }
-
             authService.saveAudit(clientSystem, pin, serial, true, msg);
 
             return UriComponentsBuilder
