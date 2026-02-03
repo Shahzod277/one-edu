@@ -114,7 +114,8 @@ public class HemisAuthConfigService {
         try {
             return stat.get()
                     .uri(uriBuilder -> uriBuilder
-                            .path("/api/integration/student/university-info-pinfl")
+                            .path("/api/integration/student/" +
+                                    "university-info-pinfl")
                             .queryParam("pinfl", pinfl)
                             .build()
                     )

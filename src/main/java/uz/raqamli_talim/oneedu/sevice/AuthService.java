@@ -144,12 +144,10 @@ public class AuthService {
 
         User user = userRepository.findActiveUserByPinfl(request.getUsername())
                 .orElseThrow(() -> new NotFoundException(ResponseMessage.NOT_FOUND.getMessage()));
-
         boolean matches = passwordEncoder.matches(request.getPassword(), user.getPassword());
         if (!matches) {
             return new ResponseDto(HttpStatus.UNAUTHORIZED.value(), "Login yoki parol noto'g'ri", false);
         }
-
         Authentication authenticate = authenticationManager
                 .authenticate(new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
 
