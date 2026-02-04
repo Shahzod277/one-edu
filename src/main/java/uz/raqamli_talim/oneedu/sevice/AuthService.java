@@ -56,6 +56,7 @@ public class AuthService {
     }
 
     // ✅ MVC / blocking
+    @Transactional
     public URI oneIdAdminSignInAndRedirect(String code, String apiKey) {
 
         ClientSystem clientSystem = clientSystemRepository.findByApiKey(apiKey)
