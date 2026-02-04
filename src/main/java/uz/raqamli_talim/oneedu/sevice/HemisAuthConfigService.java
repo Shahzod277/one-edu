@@ -187,7 +187,7 @@ public class HemisAuthConfigService {
                             r.bodyToMono(String.class)
                                     .defaultIfEmpty("")
                                     .map(b -> new RuntimeException(
-                                            "HEMIS HTTP " + r.statusCode().value() + " body=" + b
+                                            "HEMIS OTM code = "+ u.getCode()+ " HTTP " + r.statusCode().value() + " body=" + b
                                     )))
                     .bodyToMono(EduIdLoginResponse.class)
                     .block();
@@ -262,7 +262,7 @@ public class HemisAuthConfigService {
                             r.bodyToMono(String.class)
                                     .defaultIfEmpty("")
                                     .map(b -> new RuntimeException(
-                                            "HEMIS HTTP " + r.statusCode().value() + " body=" + b
+                                            "HEMIS OTM code = "+ u.getCode()+ " HTTP " + r.statusCode().value() + " body=" + b
                                     )))
                     .bodyToMono(EduIdLoginResponse.class)
                     .block();

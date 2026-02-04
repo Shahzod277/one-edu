@@ -56,6 +56,7 @@ public class MyHemisService {
             URI callbackUri = UriComponentsBuilder
                     .fromUriString("https://my.hemis.uz/auth/one-id-callback")
                     .queryParam("token", tokens.token())
+                    .queryParam("refreshToken", tokens.refreshToken())
                     .queryParam("api_url", tokens.apiUrl())
                     .build(true)
                     .toUri();
