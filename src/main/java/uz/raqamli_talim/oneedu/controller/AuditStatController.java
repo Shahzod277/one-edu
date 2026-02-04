@@ -1,15 +1,13 @@
 package uz.raqamli_talim.oneedu.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import uz.raqamli_talim.oneedu.model.OrgClientDailyStatProjection;
 import uz.raqamli_talim.oneedu.model.OrgClientMonthlyStatProjection;
 import uz.raqamli_talim.oneedu.model.OrgDailyStatProjection;
 import uz.raqamli_talim.oneedu.model.OrgMonthlyStatProjection;
 import uz.raqamli_talim.oneedu.sevice.AuditStatService;
+import uz.raqamli_talim.oneedu.sevice.HemisAuthConfigService;
 
 import java.util.List;
 
@@ -19,6 +17,7 @@ import java.util.List;
 public class AuditStatController {
 
     private final AuditStatService service;
+    private final HemisAuthConfigService hemisAuthConfigService;
 
     // 1) Org daily
     @GetMapping("/org/daily")
@@ -50,5 +49,13 @@ public class AuditStatController {
             @RequestParam(value = "orgId", required = false) Long orgId
     ) {
         return service.orgClientMonthly(orgId);
+    }
+
+    @PostMapping("test")
+    public HemisAuthConfigService.TokenData test(
+            @RequestParam(value = "pinfl", required = false) String pinfl,
+            @RequestParam(value = "serialNumber", required = false) String seralNumber
+    ) {
+        return hemisAuthConfigService.eduIdLoginTest(pinfl, seralNumber);
     }
 }

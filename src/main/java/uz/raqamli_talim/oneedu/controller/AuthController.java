@@ -59,4 +59,13 @@ public class AuthController {
                 .location(uri)
                 .build();
     }
+//    @GetMapping("my-hemis")
+//    public ResponseEntity<Void> getOneIdAdmin() {
+//        String apiKey = "my-hemis";
+//        URI uri = authService.redirectOneIdUrlAdmin(apiKey);
+//        return ResponseEntity.status(HttpStatus.FOUND)
+//                .location(uri)
+//                .build();
+//    }
+
 }

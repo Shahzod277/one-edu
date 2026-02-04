@@ -9,6 +9,7 @@ import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdResponseUserInfo;
 import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdTokenResponse;
 import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdServiceApiAdmin;
 import uz.raqamli_talim.oneedu.exception.NotFoundException;
+import uz.raqamli_talim.oneedu.model.UniversityApiUrlsResponse;
 import uz.raqamli_talim.oneedu.repository.ClientSystemRepository;
 
 import java.net.URI;
@@ -30,20 +31,27 @@ public class MyHemisService {
                 .orElseThrow(() -> new NotFoundException("Sizga ruxsat yo‘q"));
 
         if (!Boolean.TRUE.equals(clientSystem.getActive())) {
-            authService.saveAudit(clientSystem, null, null, true, "Sizga ruxsat yo‘q");
+            authService.saveAudit(clientSystem, null, null, true, "Sizga ruxsat yo‘q", null);
             throw new NotFoundException("Sizga ruxsat yo‘q");
         }
 
         // ✅ catchda ham ishlatish uchun oldindan e’lon qilamiz
-        var userInfoHolder = new Object[] { null }; // (Java var uchun kichik hack)
+        var userInfoHolder = new Object[]{null}; // (Java var uchun kichik hack)
+        var universityResponse = new Object[]{null}; // (Java var uchun kichik hack)
         // yaxshiroq variant: OneIdResponseUserInfo userInfo = null; (agar type import qilsangiz)
 
         try {
             OneIdTokenResponse token = oneIdServiceApiAdmin.getAccessAndRefreshToken(code);
             var userInfo = oneIdServiceApiAdmin.getUserInfo(token.getAccess_token());
             userInfoHolder[0] = userInfo;
+            UniversityApiUrlsResponse universityApiUrlsResponse = hemisAuthConfigService.getUniversityBaseByPinfl(userInfo.getPin());
+            universityResponse[0] = universityApiUrlsResponse;
 
-            var tokens = hemisAuthConfigService.eduIdLogin(userInfo.getPin(), userInfo.getPportNo());
+            if (universityApiUrlsResponse == null) {
+
+
+            }
+            var tokens = hemisAuthConfigService.eduIdLogin(userInfo.getPin(), userInfo.getPportNo(), universityApiUrlsResponse);
 
             URI callbackUri = UriComponentsBuilder
                     .fromUriString("https://my.hemis.uz/auth/one-id-callback")
@@ -52,7 +60,8 @@ public class MyHemisService {
                     .build(true)
                     .toUri();
 
-            authService.saveAudit(clientSystem, userInfo.getPin(), userInfo.getPportNo(), false, null);
+            assert universityApiUrlsResponse != null;
+            authService.saveAudit(clientSystem, userInfo.getPin(), userInfo.getPportNo(), false, null, universityApiUrlsResponse.getCode());
             return callbackUri;
 
         } catch (Exception e) {
@@ -61,13 +70,19 @@ public class MyHemisService {
             // ✅ userInfo bor bo‘lsa — auditga yozamiz
             String pin = null;
             String serial = null;
+            String universityCode = null;
 
             if (userInfoHolder[0] != null) {
                 var ui = (OneIdResponseUserInfo) userInfoHolder[0];
                 pin = ui.getPin();
                 serial = ui.getPportNo();
             }
-            authService.saveAudit(clientSystem, pin, serial, true, msg);
+            if (universityResponse[0] != null) {
+                var ui = (UniversityApiUrlsResponse) universityResponse[0];
+                universityCode = ui.getCode();
+            }
+
+            authService.saveAudit(clientSystem, pin, serial, true, msg, universityCode);
 
             return UriComponentsBuilder
                     .fromUriString("https://my.hemis.uz/auth/notFound")

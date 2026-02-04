@@ -60,9 +60,11 @@ public class AuthService {
 
         ClientSystem clientSystem = clientSystemRepository.findByApiKey(apiKey)
                 .orElseThrow(() -> new NotFoundException("Sizga ruxsat yo‘q"));
+        var universityCode = new Object[]{null}; // (Java var uchun kichik hack)
+
 
         if (!Boolean.TRUE.equals(clientSystem.getActive())) {
-            saveAudit(clientSystem, null, null, true, "Sizga ruxsat yo‘q");
+            saveAudit(clientSystem, null, null, true, "Sizga ruxsat yo‘q",clientSystem.getOrganization().getCode());
             throw new NotFoundException("Sizga ruxsat yo‘q");
         }
 
@@ -82,7 +84,7 @@ public class AuthService {
                     .toUri();
 
             // ✅ success audit
-            saveAudit(clientSystem, userInfo.getPin(), userInfo.getPportNo(), false, null);
+            saveAudit(clientSystem, userInfo.getPin(), userInfo.getPportNo(), false, null,clientSystem.getOrganization().getCode());
 
             return callbackUri;
 
@@ -93,7 +95,7 @@ public class AuthService {
             String pin = (userInfo != null) ? userInfo.getPin() : null;
             String serial = (userInfo != null) ? userInfo.getPportNo() : null;
 
-            saveAudit(clientSystem, pin, serial, true, msg);
+            saveAudit(clientSystem, pin, serial, true, msg,null);
 
             // ✅ eski behavior: errorni yuqoriga otish
             RuntimeException re = (RuntimeException) e;
@@ -123,11 +125,12 @@ public class AuthService {
 
 
     /** ✅ JPA save blocking bo‘lgani uchun oddiy qilib yozdik */
-    public void saveAudit(ClientSystem clientSystem, String pinfl, String serialNumber, boolean error, String errorMessage) {
+    public void saveAudit(ClientSystem clientSystem, String pinfl, String serialNumber, boolean error, String errorMessage,String universityCode) {
         Audit audit = new Audit();
         audit.setClientSystem(clientSystem);
         audit.setPinfl(pinfl);
         audit.setSerialNumber(serialNumber);
+        audit.setUniversityCode(universityCode);
         audit.setError(error);
 
         // sizning entity setter'ingiz typo bo‘lishi mumkin — o‘sha holatda qoldirdim

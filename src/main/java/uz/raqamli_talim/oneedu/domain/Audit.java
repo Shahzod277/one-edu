@@ -14,7 +14,9 @@ public class Audit extends AbstractEntity {
     private ClientSystem clientSystem;
     private String pinfl;
     private String serialNumber;
+    private String universityCode;
     private Boolean error;
+    @Column(columnDefinition = "text")
     private String errorMassage;
 
 }
