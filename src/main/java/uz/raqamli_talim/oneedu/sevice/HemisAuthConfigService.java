@@ -167,6 +167,7 @@ public class HemisAuthConfigService {
         form.add("pin", pin);
         form.add("serial", serial);
         form.add("hash", hash);
+        form.add("dbg", "1");
 
         UniversityApiUrlsResponse u = getUniversityBaseByPinfl(pin);
         if (u == null)
