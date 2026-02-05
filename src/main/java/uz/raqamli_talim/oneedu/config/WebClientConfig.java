@@ -4,6 +4,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -13,27 +14,31 @@ import reactor.netty.http.client.HttpClient;
 
 import javax.net.ssl.SSLException;
 import java.time.Duration;
-
 @Configuration
 public class WebClientConfig {
 
-    @Bean
-    WebClient webClient() throws SSLException {
+    @Bean("secureWebClientBuilder")
+    public WebClient.Builder webClientBuilder() {
+        return WebClient.builder();
+    }
 
+    @Bean("insecureWebClientBuilder")
+    public WebClient.Builder insecureWebClientBuilder() throws SSLException {
         SslContext context = SslContextBuilder.forClient()
                 .trustManager(InsecureTrustManagerFactory.INSTANCE)
                 .build();
 
-        HttpClient httpClient = HttpClient.create().secure(t -> t.sslContext(context));
-        final int size = 16 * 1024 * 1024;
-        final ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
-                .codecs(codec -> codec.defaultCodecs().maxInMemorySize(size))
-                .build();
+        HttpClient httpClient = HttpClient.create()
+                .secure(t -> t.sslContext(context));
+
         return WebClient.builder()
-                .clientConnector(new ReactorClientHttpConnector(httpClient
-                        .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
-                        .responseTimeout(Duration.ofSeconds(5))))
-                .exchangeStrategies(exchangeStrategies)
-                .build();
+                .clientConnector(new ReactorClientHttpConnector(httpClient));
+    }
+
+    @Bean("secureWebClient")
+    public WebClient secureWebClient(
+            @Qualifier("secureWebClientBuilder") WebClient.Builder builder
+    ) {
+        return builder.build();
     }
 }

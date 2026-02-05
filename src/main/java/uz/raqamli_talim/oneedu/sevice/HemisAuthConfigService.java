@@ -27,10 +27,14 @@ public class HemisAuthConfigService {
 
     private final WebClient central = WebClient.create("https://student.hemis.uz");
     private final WebClient stat    = WebClient.create("https://stat.edu.uz");
-
+    private final WebClient.Builder insecureWebClientBuilder;
     private final String secret = "hG45Jkl934mLk5fFtu387cBi";
 
     private final ObjectMapper om = new ObjectMapper();
+
+    public HemisAuthConfigService(WebClient.Builder insecureWebClientBuilder) {
+        this.insecureWebClientBuilder = insecureWebClientBuilder;
+    }
 
     // ✅ MVC / blocking
     public Boolean setKeys(String privateKey, String apiKey, String universityCode) {
@@ -173,7 +177,9 @@ public class HemisAuthConfigService {
             throw new RuntimeException("STAT api_url bo'sh: pinfl=" + pin);
 
         String baseUrl = extractBaseUrl(apiUrl);
-        WebClient wc = WebClient.create(baseUrl);
+        WebClient wc = insecureWebClientBuilder
+                .baseUrl(baseUrl)
+                .build();
 
         try {
             EduIdLoginResponse resp = wc.post()
