@@ -1,10 +1,5 @@
 package uz.raqamli_talim.oneedu.security;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,55 +15,66 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.io.IOException;
+import java.util.List;
 
 @EnableWebSecurity
-@RequiredArgsConstructor
 @Configuration
-@EnableMethodSecurity(jsr250Enabled = true)
+@RequiredArgsConstructor
+@EnableMethodSecurity(jsr250Enabled = true, prePostEnabled = true)
 public class SecurityConfig {
 
     private final AuthenticationFilter authenticationFilter;
     private final CustomAuthenticationEntryPoint authEntryPoint;
+    private final CustomAccessDeniedHandler accessDeniedHandler;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(AbstractHttpConfigurer::disable)
+        return http
                 .csrf(AbstractHttpConfigurer::disable)
-                .headers(headers -> headers
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(h -> h
                         .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
                         .contentSecurityPolicy(csp -> csp.policyDirectives("frame-ancestors 'none';"))
                 )
-                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(e -> e
+                        .authenticationEntryPoint(authEntryPoint)   // ✅ 401
+                        .accessDeniedHandler(accessDeniedHandler)   // ✅ 403
+                )
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers("/api/**").permitAll()
-                        .requestMatchers("/docs/**").permitAll()
-                        .requestMatchers("/api/auth/**").permitAll()
+                        // 🔓 OCHIQ APIlar
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/api/audit-stats/**"
+                        ).permitAll()
+
+                        // 🔒 QOLGAN APIlar YOPIQ
+                        .requestMatchers("/api/**").authenticated()
+
+                        // 🔒 BOSHQA HAMMASI YOPIQ
                         .anyRequest().authenticated()
                 )
+
                 .addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .exceptionHandling(e -> e.authenticationEntryPoint(authEntryPoint));
-
-        http.addFilterAfter(new OncePerRequestFilter() {
-            @Override
-            protected void doFilterInternal(@NonNull HttpServletRequest request,
-                                            @NonNull HttpServletResponse response,
-                                            @NonNull FilterChain filterChain)
-                    throws ServletException, IOException {
-                response.setHeader("X-Frame-Options", "DENY");
-                response.setHeader("Content-Security-Policy", "frame-ancestors 'none';");
-                filterChain.doFilter(request, response);
-            }
-        }, UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
+                .build();
     }
 
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration cfg = new CorsConfiguration();
+        cfg.setAllowedOriginPatterns(List.of("*")); // allowedOrigins("*") o‘rniga
+        cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        cfg.setAllowedHeaders(List.of("*"));
+        cfg.setAllowCredentials(false);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", cfg);
+        return source;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -76,19 +82,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    AuthenticationManager authenticationManager(AuthenticationConfiguration auth) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration auth) throws Exception {
         return auth.getAuthenticationManager();
-    }
-
-    @Bean
-    public WebMvcConfigurer corsConfigurer() {
-        return new WebMvcConfigurer() {
-            @Override
-            public void addCorsMappings(@NonNull CorsRegistry registry) {
-                registry.addMapping("/**")
-                        .allowedOrigins("*")
-                        .allowedMethods("*");
-            }
-        };
     }
 }
