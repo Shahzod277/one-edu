@@ -24,7 +24,7 @@ import java.util.List;
 @EnableWebSecurity
 @Configuration
 @RequiredArgsConstructor
-@EnableMethodSecurity(jsr250Enabled = true, prePostEnabled = true)
+@EnableMethodSecurity(jsr250Enabled = true)
 public class SecurityConfig {
 
     private final AuthenticationFilter authenticationFilter;
@@ -51,7 +51,13 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/audit-stats/**"
                         ).permitAll()
-
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/docs/**",
+                                "/webjars/**"
+                        ).permitAll()
                         // 🔒 QOLGAN APIlar YOPIQ
                         .requestMatchers("/api/**").authenticated()
 
