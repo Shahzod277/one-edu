@@ -6,8 +6,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
 import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdResponseUserInfo;
-import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdTokenResponse;
 import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdServiceApiAdmin;
+import uz.raqamli_talim.oneedu.api_integration.one_id_api.OneIdTokenResponse;
 import uz.raqamli_talim.oneedu.exception.NotFoundException;
 import uz.raqamli_talim.oneedu.model.UniversityApiUrlsResponse;
 import uz.raqamli_talim.oneedu.repository.ClientSystemRepository;
@@ -17,7 +17,7 @@ import java.net.URI;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class MyHemisService {
+public class EmployeeHemisService {
 
     private final OneIdServiceApiAdmin oneIdServiceApiAdmin;
     private final ClientSystemRepository clientSystemRepository;
@@ -25,7 +25,7 @@ public class MyHemisService {
     private final HemisAuthConfigService hemisAuthConfigService;
 
     @Transactional
-    public URI oneIdAdminSignInAndRedirect(String code, String apiKey) {
+    public URI oneIdAdminSignInAndRedirect(String code, String apiKey,String universityCode,String type) {
 
         var clientSystem = clientSystemRepository.findByApiKey(apiKey)
                 .orElseThrow(() -> new NotFoundException("Sizga ruxsat yo‘q"));
@@ -44,17 +44,17 @@ public class MyHemisService {
             OneIdTokenResponse token = oneIdServiceApiAdmin.getAccessAndRefreshToken(code);
             var userInfo = oneIdServiceApiAdmin.getUserInfo(token.getAccess_token());
             userInfoHolder[0] = userInfo;
-            UniversityApiUrlsResponse universityApiUrlsResponse = hemisAuthConfigService.getUniversityBaseByPinflStudent(userInfo.getPin());
+            UniversityApiUrlsResponse universityApiUrlsResponse = hemisAuthConfigService.getUniversityBaseByPinflEmployee(userInfo.getPin(),universityCode);
             universityResponse[0] = universityApiUrlsResponse;
 
             if (universityApiUrlsResponse == null) {
 
 
             }
-            var tokens = hemisAuthConfigService.eduIdLogin(userInfo.getPin(), userInfo.getPportNo(), universityApiUrlsResponse);
+            var tokens = hemisAuthConfigService.eduIdLoginEmployee(userInfo.getPin(), userInfo.getPportNo(), universityApiUrlsResponse,type);
 
             URI callbackUri = UriComponentsBuilder
-                    .fromUriString("https://my.hemis.uz/auth/one-id-callback")
+                    .fromUriString("https://tyutor.hemis.uz/auth/one-id-callback")
                     .queryParam("token", tokens.token())
                     .queryParam("refreshToken", tokens.refreshToken())
                     .queryParam("api_url", tokens.apiUrl())
@@ -71,7 +71,6 @@ public class MyHemisService {
             // ✅ userInfo bor bo‘lsa — auditga yozamiz
             String pin = null;
             String serial = null;
-            String universityCode = null;
 
             if (userInfoHolder[0] != null) {
                 var ui = (OneIdResponseUserInfo) userInfoHolder[0];
@@ -86,7 +85,7 @@ public class MyHemisService {
             authService.saveAudit(clientSystem, pin, serial, true, msg, universityCode);
 
             return UriComponentsBuilder
-                    .fromUriString("https://my.hemis.uz/auth/notFound")
+                    .fromUriString("https://tyutor.hemis.uz/auth/notFound")
                     .build(true)
                     .toUri();
         }

@@ -58,4 +58,14 @@ public class AuditStatController {
     ) {
         return hemisAuthConfigService.eduIdLoginTest(pinfl, seralNumber);
     }
+
+    @PostMapping("test-employee")
+    public HemisAuthConfigService.TokenData testEmployee(
+            @RequestParam(value = "pinfl", required = false) String pinfl,
+            @RequestParam(value = "serialNumber", required = false) String seralNumber,
+            @RequestParam(value = "universityCode", required = false) String universityCode,
+            @RequestParam(value = "type", required = false) String type
+    ) {
+        return hemisAuthConfigService.eduIdLoginEmployeeTest(pinfl, seralNumber,universityCode,type);
+    }
 }

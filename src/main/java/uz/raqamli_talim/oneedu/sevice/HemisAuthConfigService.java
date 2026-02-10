@@ -111,7 +111,7 @@ public class HemisAuthConfigService {
     }
 
     // ✅ MVC / blocking
-    public UniversityApiUrlsResponse getUniversityBaseByPinfl(String pinfl) {
+    public UniversityApiUrlsResponse getUniversityBaseByPinflStudent(String pinfl) {
         if (pinfl == null || pinfl.isBlank())
             throw new IllegalArgumentException("pinfl bo'sh");
 
@@ -138,6 +138,36 @@ public class HemisAuthConfigService {
             throw new RuntimeException("STAT HTTP " + e.getStatusCode().value() + " body=" + e.getResponseBodyAsString(), e);
         }
     }
+
+    public UniversityApiUrlsResponse getUniversityBaseByPinflEmployee(String pinfl,String universityCode) {
+        if (pinfl == null || pinfl.isBlank())
+            throw new IllegalArgumentException("pinfl bo'sh");
+
+        try {
+            return stat.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/api/integration/employee/" +
+                                    "university-info-pinfl")
+                            .queryParam("pinfl", pinfl)
+                            .queryParam("universityCode", universityCode)
+                            .build()
+                    )
+                    .retrieve()
+                    .onStatus(s -> s.value() == 404,
+                            r -> r.bodyToMono(String.class)
+                                    .defaultIfEmpty("")
+                                    .map(b -> new RuntimeException("STAT: employee/university topilmadi: pinfl=" + pinfl + " body=" + b)))
+                    .onStatus(HttpStatusCode::is5xxServerError,
+                            r -> r.bodyToMono(String.class)
+                                    .defaultIfEmpty("")
+                                    .map(b -> new RuntimeException("STAT tizimida uzilish bor. body=" + b)))
+                    .bodyToMono(UniversityApiUrlsResponse.class)
+                    .block();
+        } catch (WebClientResponseException e) {
+            throw new RuntimeException("STAT HTTP " + e.getStatusCode().value() + " body=" + e.getResponseBodyAsString(), e);
+        }
+    }
+
 
     // ✅ MVC / blocking
     public TokenData eduIdLoginTest(String pin, String serial) {
@@ -169,7 +199,7 @@ public class HemisAuthConfigService {
         form.add("hash", hash);
         form.add("dbg", "1");
 
-        UniversityApiUrlsResponse u = getUniversityBaseByPinfl(pin);
+        UniversityApiUrlsResponse u = getUniversityBaseByPinflStudent(pin);
         if (u == null)
             throw new RuntimeException("STAT topilmadi: pinfl=" + pin);
 
@@ -297,6 +327,169 @@ public class HemisAuthConfigService {
             );
         }
     }
+    // ✅ MVC / blocking
+    public TokenData eduIdLoginEmployeeTest(String pin, String serial,String universityCode,String type) {
+
+        if (pin == null || pin.isBlank())
+            throw new IllegalArgumentException("pin bo'sh");
+        if (serial == null || serial.isBlank())
+            throw new IllegalArgumentException("serial bo'sh");
+
+        pin = pin.trim().replaceAll("\\s+", "");
+        serial = serial.trim().replaceAll("\\s+", "").toUpperCase();
+
+        long ts = Instant.now().getEpochSecond();
+        String nonce = randomHex16bytes();
+
+        String canonical =
+                "PASSPORT_LOGIN\n" +
+                        pin + "\n" +
+                        serial + "\n" +
+                        ts + "\n" +
+                        nonce;
+
+        String sigBase64 = hmacSha256Base64(secret, canonical);
+        String hash = ts + ":" + nonce + ":" + sigBase64;
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("pin", pin);
+        form.add("serial", serial);
+        form.add("hash", hash);
+        form.add("type", type);
+        form.add("dbg", "1");
+
+        UniversityApiUrlsResponse u = getUniversityBaseByPinflEmployee(pin,universityCode);
+        if (u == null)
+            throw new RuntimeException("STAT topilmadi: pinfl=" + pin);
+
+        String apiUrl = u.getApi_url();
+        if (apiUrl == null || apiUrl.isBlank())
+            throw new RuntimeException("STAT api_url bo'sh: pinfl=" + pin);
+
+        String baseUrl = extractBaseUrl(apiUrl);
+        WebClient wc = insecureWebClientBuilder
+                .baseUrl(baseUrl)
+                .build();
+
+        try {
+            EduIdLoginResponse resp = wc.post()
+                    .uri("/rest/v1/auth/edu-id-login-employee")
+                    .header(HttpHeaders.USER_AGENT, "id.edu.uz")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .body(BodyInserters.fromFormData(form))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, r ->
+                            r.bodyToMono(String.class)
+                                    .defaultIfEmpty("")
+                                    .map(b -> new RuntimeException(
+                                            "HEMIS OTM code = "+ u.getCode()+ " HTTP " + r.statusCode().value() + " body=" + b
+                                    )))
+                    .bodyToMono(EduIdLoginResponse.class)
+                    .block();
+
+            if (resp == null)
+                throw new RuntimeException("HEMIS response null");
+
+            if (!Boolean.TRUE.equals(resp.success))
+                throw new RuntimeException(resp.error != null ? resp.error : "HEMIS success=false");
+
+            if (resp.data == null || resp.data.token == null || resp.data.token.isBlank())
+                throw new RuntimeException("HEMIS token qaytmadi");
+
+            return new TokenData(
+                    resp.data.token,
+                    resp.data.refresh_token,
+                    apiUrl,
+                    baseUrl
+            );
+
+        } catch (WebClientResponseException e) {
+            throw new RuntimeException(
+                    "HEMIS HTTP " + e.getStatusCode().value() + " body=" + e.getResponseBodyAsString(),
+                    e
+            );
+        }
+    }
+
+    public TokenData eduIdLoginEmployee(String pin, String serial,UniversityApiUrlsResponse u,String type) {
+
+        if (pin == null || pin.isBlank())
+            throw new IllegalArgumentException("pin bo'sh");
+        if (serial == null || serial.isBlank())
+            throw new IllegalArgumentException("serial bo'sh");
+
+        pin = pin.trim().replaceAll("\\s+", "");
+        serial = serial.trim().replaceAll("\\s+", "").toUpperCase();
+
+        long ts = Instant.now().getEpochSecond();
+        String nonce = randomHex16bytes();
+
+        String canonical =
+                "PASSPORT_LOGIN\n" +
+                        pin + "\n" +
+                        serial + "\n" +
+                        ts + "\n" +
+                        nonce;
+
+        String sigBase64 = hmacSha256Base64(secret, canonical);
+        String hash = ts + ":" + nonce + ":" + sigBase64;
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("pin", pin);
+        form.add("serial", serial);
+        form.add("type", type);
+        form.add("hash", hash);
+        String apiUrl = u.getApi_url();
+        if (apiUrl == null || apiUrl.isBlank())
+            throw new RuntimeException("STAT api_url bo'sh: pinfl=" + pin);
+
+        String baseUrl = extractBaseUrl(apiUrl);
+        WebClient wc = WebClient.create(baseUrl);
+
+        try {
+            EduIdLoginResponse resp = wc.post()
+                    .uri("/rest/v1/auth/edu-id-login-employee")
+                    .header(HttpHeaders.USER_AGENT, "id.edu.uz")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .body(BodyInserters.fromFormData(form))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, r ->
+                            r.bodyToMono(String.class)
+                                    .defaultIfEmpty("")
+                                    .map(b -> new RuntimeException(
+                                            "HEMIS OTM code = "+ u.getCode()+ " HTTP " + r.statusCode().value() + " body=" + b
+                                    )))
+                    .bodyToMono(EduIdLoginResponse.class)
+                    .block();
+
+            if (resp == null)
+                throw new RuntimeException("HEMIS response null");
+
+            if (!Boolean.TRUE.equals(resp.success))
+                throw new RuntimeException(resp.error != null ? resp.error : "HEMIS success=false");
+
+            if (resp.data == null || resp.data.token == null || resp.data.token.isBlank())
+                throw new RuntimeException("HEMIS token qaytmadi");
+
+            return new TokenData(
+                    resp.data.token,
+                    resp.data.refresh_token,
+                    apiUrl,
+                    baseUrl
+            );
+
+        } catch (WebClientResponseException e) {
+            throw new RuntimeException(
+                    "HEMIS HTTP " + e.getStatusCode().value() + " body=" + e.getResponseBodyAsString(),
+                    e
+            );
+        }
+    }
+
+
+
 
 
     private static String randomHex16bytes() {
