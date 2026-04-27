@@ -52,12 +52,33 @@ All entities extending `AbstractEntity` get: `id`, `createdAt`, `createdBy`, `up
 
 Soft delete pattern: set `isActive = false`, query with `findAllByIsActiveTrue()` / `findByIdAndIsActiveTrue()`.
 
+## API Endpoints
+
+**Auth:** `/api/auth/**` — One-ID OAuth redirect va callback, admin login (`POST /api/auth/public/signIn`)
+
+**Organization CRUD:** `/api/organizations` — create, getById, list, paginated search, update, soft delete. Duplicate code tekshirish bor.
+
+**Client Systems:** `/api/client-systems` — CRUD + HEMIS'ga key push (`POST /push-hemis/{id}`), filtrlash (active, isPushed, orgId, search).
+
+**Dashboard Statistics:** `/api/audit-stats/dashboard/*` — 9 ta endpoint:
+- `summary` — bugungi + all-time raqamlar
+- `monthly-trend?months=6` — oylik grafik uchun
+- `monthly-comparison` — joriy vs oldingi oy + o'sish foizi
+- `top-organizations?limit=10` — eng faol orglar
+- `top-error-organizations?limit=10` — eng ko'p xato bergan orglar
+- `unique-users-trend?months=6` — unikal foydalanuvchilar dinamikasi
+- `peak-hours` — soatlar kesimida yuk (0-23)
+- `error-breakdown?limit=20` — xato turlari bo'yicha guruhlash
+- `client-uptime` — har bir client system oxirgi faoliyati
+
+Batafsil response formatlari `DASHBOARD_API.md` da.
+
 ## Security
 
-Public endpoints: `/api/auth/**`, `/api/audit-stats/**`, Swagger docs.
-Everything else requires JWT Bearer token.
+Public endpoints: `/api/auth/**`, `/api/audit-stats/**` (eski 4 ta stat endpoint), Swagger docs.
+Dashboard endpoint'lari va qolgan barcha API'lar JWT Bearer token talab qiladi.
 
-Secrets are in environment variables (see `.env.example`): `DB_PASSWORD`, `JWT_SECRET`, `ONEID_ADMIN_CLIENT_SECRET`, `ONEID_USER_CLIENT_SECRET`.
+Secrets are in environment variables (see `.env.example`): `DB_PASSWORD`, `JWT_SECRET`, `ONEID_ADMIN_CLIENT_SECRET`, `ONEID_USER_CLIENT_SECRET`. One-ID OAuth credentials kodda emas, `application.yml` da `${ENV_VAR}` orqali oqiladi.
 
 ## Conventions
 
@@ -66,3 +87,4 @@ Secrets are in environment variables (see `.env.example`): `DB_PASSWORD`, `JWT_S
 - `ResponseMessage` enum holds standard messages
 - `ClientSystem` entity does NOT extend `AbstractEntity` — it has its own `id` and `active` field
 - Dashboard stats use native SQL queries with Spring Data projection interfaces
+- Organization/Audit entities use soft delete (`isActive = false`), ClientSystem uses `active = false`
