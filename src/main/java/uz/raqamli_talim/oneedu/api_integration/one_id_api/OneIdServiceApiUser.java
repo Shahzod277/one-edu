@@ -2,6 +2,7 @@ package uz.raqamli_talim.oneedu.api_integration.one_id_api;
 
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -12,12 +13,14 @@ import java.net.URI;
 @RequiredArgsConstructor
 public class OneIdServiceApiUser {
 
-    private final String client_id = "kasbiy_edu_uz";
-    private final String scope = "kasbiy.edu.uz";
-    private final String redirect_uri = "https://apv.edu.uz/api/public/auth/code";
-    private final String client_secret = "Xq92HdZ06YXKp5s53XI9HjGy";
-    public static final String ONE_ID_LOGIN = "kasbiy_edu_uz";
-    public static final String ONE_ID_PASSWORD = "Xq92HdZ06YXKp5s53XI9HjGy";
+    @Value("${one-id.user.client-id}")
+    private String client_id;
+    @Value("${one-id.user.scope}")
+    private String scope;
+    @Value("${one-id.user.redirect-uri}")
+    private String redirect_uri;
+    @Value("${one-id.user.client-secret}")
+    private String client_secret;
     private final WebClient webClient;
 
     public URI redirectOneIdUrlUser() {
@@ -43,7 +46,7 @@ public class OneIdServiceApiUser {
                         "&client_secret=" + client_secret +
                         "&code=" + code +
                         "&redirect_uri=" + redirect_uri)
-                .headers(httpHeaders -> httpHeaders.setBasicAuth(ONE_ID_LOGIN, ONE_ID_PASSWORD))
+                .headers(httpHeaders -> httpHeaders.setBasicAuth(client_id, client_secret))
                 .retrieve()
                 .bodyToMono(OneIdTokenResponse.class)
                 .block();
@@ -58,7 +61,6 @@ public class OneIdServiceApiUser {
                         "&client_secret=" + client_secret +
                         "&access_token=" + accessToken +
                         "&scope=" + scope)
-//                .headers(httpHeaders -> httpHeaders.setBasicAuth(ONE_ID_LOGIN, ONE_ID_PASSWORD))
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .bodyToMono(OneIdResponseUserInfo.class)

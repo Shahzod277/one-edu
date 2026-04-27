@@ -44,7 +44,5 @@ public interface ClientSystemRepository extends CrudRepository<ClientSystem, Lon
 boolean existsActiveByOrganizationId(Long organizationId);
     boolean existsByApiKey(String apiKey);
 
-
-
-
+    long countByActiveTrue();
 }

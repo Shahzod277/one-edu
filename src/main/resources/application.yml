@@ -12,9 +12,9 @@ spring:
   application:
     name: one-edu
   datasource:
-    url: jdbc:postgresql://172.18.10.42:5432/one_edu
-    username: postgres
-    password: 2030306
+    url: ${DB_URL:jdbc:postgresql://172.18.10.42:5432/one_edu}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -23,7 +23,7 @@ spring:
     open-in-view: false
     show-sql: true
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
   servlet:
     multipart:
       max-file-size: 20MB      # bitta fayl uchun maksimal hajm
@@ -44,4 +44,16 @@ springdoc:
 #    iib_location: /home/software/kasbiy_edu/fileStorageIIB/
 
 jwt:
-  secret: '[0-9.a-zA-z_]^+$ProfEduPlatformSecretKey1230321Akj9dfd6kf12fdASQrFbsMrXh56@409nPgGfd528482'
+  secret: ${JWT_SECRET}
+
+one-id:
+  admin:
+    client-id: ${ONEID_ADMIN_CLIENT_ID:edu_hemis}
+    client-secret: ${ONEID_ADMIN_CLIENT_SECRET}
+    scope: ${ONEID_ADMIN_SCOPE:hemis.uz}
+    redirect-uri: ${ONEID_ADMIN_REDIRECT_URI:https://hemis.uz/api/auth/callback}
+  user:
+    client-id: ${ONEID_USER_CLIENT_ID:kasbiy_edu_uz}
+    client-secret: ${ONEID_USER_CLIENT_SECRET}
+    scope: ${ONEID_USER_SCOPE:kasbiy.edu.uz}
+    redirect-uri: ${ONEID_USER_REDIRECT_URI:https://apv.edu.uz/api/public/auth/code}
