@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import uz.raqamli_talim.oneedu.model.OrganizationDto;
 import uz.raqamli_talim.oneedu.model.OrganizationRequest;
 import uz.raqamli_talim.oneedu.model.ResponseDto;
-import uz.raqamli_talim.oneedu.sevice.OrganizationService;
+import uz.raqamli_talim.oneedu.service.OrganizationService;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package uz.raqamli_talim.oneedu.sevice;
+package uz.raqamli_talim.oneedu.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

@@ -1,4 +1,4 @@
-package uz.raqamli_talim.oneedu.sevice;
+package uz.raqamli_talim.oneedu.service;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;

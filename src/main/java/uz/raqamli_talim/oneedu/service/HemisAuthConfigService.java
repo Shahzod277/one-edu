@@ -1,4 +1,4 @@
-package uz.raqamli_talim.oneedu.sevice;
+package uz.raqamli_talim.oneedu.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;

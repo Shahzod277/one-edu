@@ -6,8 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import uz.raqamli_talim.oneedu.model.*;
-import uz.raqamli_talim.oneedu.sevice.AuditStatService;
-import uz.raqamli_talim.oneedu.sevice.HemisAuthConfigService;
+import uz.raqamli_talim.oneedu.service.AuditStatService;
+import uz.raqamli_talim.oneedu.service.HemisAuthConfigService;
 
 import java.util.List;
 

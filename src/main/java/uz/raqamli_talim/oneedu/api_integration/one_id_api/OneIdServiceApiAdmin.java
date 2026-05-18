@@ -1,7 +1,7 @@
 package uz.raqamli_talim.oneedu.api_integration.one_id_api;
 
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -10,7 +10,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.net.URI;
 
 @Service
-@RequiredArgsConstructor
 public class OneIdServiceApiAdmin {
 
     @Value("${one-id.admin.client-id}")
@@ -22,6 +21,10 @@ public class OneIdServiceApiAdmin {
     @Value("${one-id.admin.client-secret}")
     private String client_secret;
     private final WebClient webClient;
+
+    public OneIdServiceApiAdmin(@Qualifier("insecureWebClient") WebClient webClient) {
+        this.webClient = webClient;
+    }
 
     public URI redirectOneIdUrl(String apiKey) {
 

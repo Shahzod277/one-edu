@@ -10,8 +10,8 @@ import uz.raqamli_talim.oneedu.model.ClientSystemDto;
 import uz.raqamli_talim.oneedu.model.ClientSystemRequest;
 import uz.raqamli_talim.oneedu.model.OrganizationDto;
 import uz.raqamli_talim.oneedu.model.ResponseDto;
-import uz.raqamli_talim.oneedu.sevice.ClientSystemService;
-import uz.raqamli_talim.oneedu.sevice.OrganizationService;
+import uz.raqamli_talim.oneedu.service.ClientSystemService;
+import uz.raqamli_talim.oneedu.service.OrganizationService;
 
 import java.util.List;
 

@@ -30,6 +30,8 @@ public class SecurityConfig {
     private final AuthenticationFilter authenticationFilter;
     private final CustomAuthenticationEntryPoint authEntryPoint;
     private final CustomAccessDeniedHandler accessDeniedHandler;
+    private final RateLimitFilter rateLimitFilter;
+    private final CsrfTokenFilter csrfTokenFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -49,7 +51,8 @@ public class SecurityConfig {
                         // 🔓 OCHIQ APIlar
                         .requestMatchers(
                                 "/api/auth/**",
-                                "/api/audit-stats/**"
+                                "/api/audit-stats/**",
+                                "/one-id-login.html"
                         ).permitAll()
                         .requestMatchers(
                                 "/v3/api-docs/**",
@@ -65,6 +68,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(csrfTokenFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

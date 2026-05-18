@@ -6,13 +6,15 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.web.config.EnableSpringDataWebSupport;
-import uz.raqamli_talim.oneedu.sevice.AuditStatService;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import uz.raqamli_talim.oneedu.service.AuditStatService;
 
 import static org.springframework.data.web.config.EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO;
 
 @SpringBootApplication
 @EnableJpaAuditing(auditorAwareRef = "auditorAwareImpl", modifyOnCreate = false)
 @EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)
+@EnableScheduling
 public class OneEduApplication implements CommandLineRunner {
     @Autowired
     private AuditStatService service;

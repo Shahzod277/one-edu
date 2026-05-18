@@ -1,4 +1,4 @@
-package uz.raqamli_talim.oneedu.sevice;
+package uz.raqamli_talim.oneedu.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,7 +41,6 @@ import java.net.URI;
 public class AuthService {
 
     private final OneIdServiceApiAdmin oneIdServiceApiAdmin;
-    private final ClientSystemRepository systemRepository;         // o'zi ishlatilmasa ham o'zgartirmadim
     private final ClientSystemRepository clientSystemRepository;
     private final WebClient webClient;                             // ishlatilmasa ham o'zgartirmadim
     private final UserRepository userRepository;
@@ -61,7 +60,7 @@ public class AuthService {
 
         ClientSystem clientSystem = clientSystemRepository.findByApiKey(apiKey)
                 .orElseThrow(() -> new NotFoundException("Sizga ruxsat yo‘q"));
-        var universityCode = new Object[]{null}; // (Java var uchun kichik hack)
+        // (Java var uchun kichik hack)
 
 
         if (!Boolean.TRUE.equals(clientSystem.getActive())) {

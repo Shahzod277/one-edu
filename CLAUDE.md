@@ -40,7 +40,7 @@ The `state` parameter in OAuth flow carries the `apiKey` (or `my-hemis`, `my-tut
 
 - `api_integration/one_id_api/` — One-ID OAuth client (token exchange, user info)
 - `security/` — JWT auth filter, Spring Security config
-- `sevice/` — business logic (note: package name is intentionally `sevice`, not `service`)
+- `service/` — business logic
 - `domain/` — JPA entities, all extend `AbstractEntity` (soft delete via `isActive`, optimistic locking via `@Version`, JPA auditing)
 - `model/` — DTOs, request objects, and native query projection interfaces
 
