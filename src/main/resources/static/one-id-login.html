@@ -187,7 +187,7 @@
             document.getElementById('apiKey').value = apiKey;
 
             // OneID redirect tugmasi
-            document.getElementById('btnOneId').href = '/api/auth/oneid-redirect?apiKey=' + encodeURIComponent(apiKey);
+            document.getElementById('btnOneId').href = 'https://sso.egov.uz/sso/oauth/Authorization.do?response_type=one_code&client_id=edu_hemis&scope=hemis.uz&redirect_uri=' + encodeURIComponent('https://hemis.uz/api/auth/callback') + '&state=' + encodeURIComponent(apiKey);
 
             var errorParam = params.get('error');
             if (errorParam) {
