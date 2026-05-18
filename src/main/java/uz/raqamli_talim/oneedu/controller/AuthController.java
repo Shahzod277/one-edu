@@ -42,13 +42,9 @@ public class AuthController {
      */
     @GetMapping("/{apiKey}")
     public ResponseEntity<Void> getOneIdAdmin(@PathVariable String apiKey) {
-        URI loginPage = UriComponentsBuilder
-                .fromUriString("/one-id-login.html")
-                .queryParam("apiKey", apiKey)
-                .build(true)
-                .toUri();
+        URI oneIdUrl = authService.redirectOneIdUrlAdmin(apiKey);
         return ResponseEntity.status(HttpStatus.FOUND)
-                .location(loginPage)
+                .location(oneIdUrl)
                 .build();
     }
 
